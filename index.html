@@ -8,6 +8,24 @@
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        blush: { 100:'#FFF0F3', 200:'#FFCCD5',
+          300:'#FF8FA3', 400:'#FF4D6D' },
+        sage: { 100:'#F0F4EF', 200:'#D8E8D4',
+          300:'#A3C48B', 400:'#6B9E4F' },
+        cream: { 50:'#FFFDF7', 100:'#FFF8E7' },
+        charcoal: { 700:'#3D3D3D', 800:'#2B2B2B',
+          900:'#1A1A1A' }
+      },
+      fontFamily: { Inter: ['Inter','sans-serif'] }
+    }
+  }
+}
+</script>
 
   <!-- Google Fonts: Inter -->
   <link rel="preconnect" href=
