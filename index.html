@@ -8,7 +8,6 @@
   <meta name="theme-color" content="#FFF0F3" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -32,16 +31,10 @@
       }
     }
   </script>
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-
-  <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-
-  <!-- Custom Styles -->
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body class="bg-cream-50 font-Inter overflow-hidden h-screen select-none">
@@ -50,9 +43,7 @@
   <!-- SCREEN 1: LOCK SCREEN                       -->
   <!-- ============================================ -->
   <div id="lockScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden">
-    <!-- Animated gradient background -->
     <div class="absolute inset-0 bg-gradient-animated"></div>
-    <!-- Floating hearts decoration -->
     <div class="floating-hearts absolute inset-0 pointer-events-none overflow-hidden">
       <i class="fa-solid fa-heart floating-heart" style="left:10%;animation-delay:0s;font-size:12px;opacity:0.15"></i>
       <i class="fa-solid fa-heart floating-heart" style="left:25%;animation-delay:2s;font-size:8px;opacity:0.1"></i>
@@ -61,8 +52,7 @@
       <i class="fa-solid fa-heart floating-heart" style="left:80%;animation-delay:3s;font-size:14px;opacity:0.13"></i>
       <i class="fa-solid fa-heart floating-heart" style="left:90%;animation-delay:5s;font-size:9px;opacity:0.08"></i>
     </div>
-
-    <div class="relative z-10 text-center mb-8">
+    <div class="relative z-10 text-center mb-6">
       <div class="heart-pulse inline-block mb-4">
         <i class="fa-solid fa-heart text-blush-400 text-5xl"></i>
       </div>
@@ -70,31 +60,34 @@
       <p class="text-charcoal-600 text-sm font-light tracking-wide">Your story, kept safe</p>
     </div>
 
-    <!-- PIN Dots -->
-    <div id="pinDots" class="relative z-10 flex gap-4 mb-4">
-      <span class="pin-dot"></span>
-      <span class="pin-dot"></span>
-      <span class="pin-dot"></span>
-      <span class="pin-dot"></span>
+    <!-- PIN Display -->
+    <div class="relative z-10 mb-6">
+      <div id="pinDisplay" class="flex items-center justify-center gap-3 h-14 px-6 bg-white/60 backdrop-blur-md rounded-2xl border border-blush-200/50 min-w-[180px]">
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
+      </div>
+      <p id="pinError" class="text-blush-400 text-xs mt-2 h-5 font-medium tracking-wide text-center"></p>
     </div>
-    <p id="pinError" class="relative z-10 text-blush-400 text-xs mb-6 h-5 font-medium tracking-wide"></p>
 
     <!-- PIN Pad -->
     <div id="pinPad" class="relative z-10 grid grid-cols-3 gap-3 w-72">
       <button onclick="pinInput('1')" class="pin-btn"><span>1</span></button>
-      <button onclick="pinInput('2')" class="pin-btn"><span>2</span><small>ABC</small></button>
-      <button onclick="pinInput('3')" class="pin-btn"><span>3</span><small>DEF</small></button>
-      <button onclick="pinInput('4')" class="pin-btn"><span>4</span><small>GHI</small></button>
-      <button onclick="pinInput('5')" class="pin-btn"><span>5</span><small>JKL</small></button>
-      <button onclick="pinInput('6')" class="pin-btn"><span>6</span><small>MNO</small></button>
-      <button onclick="pinInput('7')" class="pin-btn"><span>7</span><small>PQRS</small></button>
-      <button onclick="pinInput('8')" class="pin-btn"><span>8</span><small>TUV</small></button>
-      <button onclick="pinInput('9')" class="pin-btn"><span>9</span><small>WXYZ</small></button>
+      <button onclick="pinInput('2')" class="pin-btn"><span>2</span></button>
+      <button onclick="pinInput('3')" class="pin-btn"><span>3</span></button>
+      <button onclick="pinInput('4')" class="pin-btn"><span>4</span></button>
+      <button onclick="pinInput('5')" class="pin-btn"><span>5</span></button>
+      <button onclick="pinInput('6')" class="pin-btn"><span>6</span></button>
+      <button onclick="pinInput('7')" class="pin-btn"><span>7</span></button>
+      <button onclick="pinInput('8')" class="pin-btn"><span>8</span></button>
+      <button onclick="pinInput('9')" class="pin-btn"><span>9</span></button>
       <div></div>
       <button onclick="pinInput('0')" class="pin-btn"><span>0</span></button>
       <button onclick="pinDelete()" class="pin-btn-delete"><i class="fa-solid fa-delete-left text-lg"></i></button>
     </div>
-    <button id="setPinBtn" onclick="setFirstPin()" class="relative z-10 hidden mt-8 btn-primary">Set PIN</button>
+    <button id="pinEnterBtn" onclick="submitPin()" class="relative z-10 mt-5 btn-primary">Enter</button>
+    <button id="setPinBtn" onclick="setFirstPin()" class="relative z-10 hidden mt-3 btn-primary">Set PIN</button>
   </div>
 
   <!-- ============================================ -->
@@ -127,7 +120,6 @@
   <!-- ============================================ -->
   <div id="appShell" class="flex flex-col h-screen" style="display:none">
 
-    <!-- Top Bar -->
     <header class="flex items-center justify-between px-5 py-3 bg-white/70 backdrop-blur-xl border-b border-warmgray-100 z-10">
       <div class="flex items-center gap-2">
         <i class="fa-solid fa-heart text-blush-400 text-sm"></i>
@@ -139,12 +131,10 @@
       </div>
     </header>
 
-    <!-- Scrollable Content Area -->
     <main id="mainContent" class="flex-1 overflow-y-auto overflow-x-hidden pb-24 scroll-smooth">
 
       <!-- HOME SCREEN -->
       <div id="screenHome" class="screen page-enter p-5">
-        <!-- Nerd Stats Dashboard -->
         <div class="grid grid-cols-3 gap-3 mb-6">
           <div class="stat-card stat-blush">
             <i class="fa-solid fa-heart text-blush-300 text-xs mb-1 block"></i>
@@ -162,13 +152,10 @@
             <p class="stat-label">Photos</p>
           </div>
         </div>
-        <!-- Section Header -->
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-bold text-charcoal-800">Our Timeline</h2>
         </div>
-        <!-- Timeline Feed -->
         <div id="timelineFeed" class="space-y-4"></div>
-        <!-- Empty State -->
         <div id="timelineEmpty" class="empty-state">
           <div class="empty-icon-wrap">
             <i class="fa-solid fa-book-open"></i>
@@ -182,13 +169,11 @@
       <div id="screenWiki" class="screen p-5" style="display:none">
         <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Wiki</h2>
         <p class="text-charcoal-600 text-sm font-light mb-5">The encyclopedia of us</p>
-        <!-- Wiki Tabs -->
         <div class="tab-bar mb-5">
           <button onclick="showWikiTab('characters')" class="tab-btn active" data-tab="characters"><i class="fa-solid fa-user-group mr-1.5"></i>Characters</button>
           <button onclick="showWikiTab('locations')" class="tab-btn" data-tab="locations"><i class="fa-solid fa-map-pin mr-1.5"></i>Places</button>
           <button onclick="showWikiTab('jokes')" class="tab-btn" data-tab="jokes"><i class="fa-solid fa-face-laugh-beam mr-1.5"></i>Jokes</button>
         </div>
-        <!-- Characters -->
         <div id="wikiCharacters" class="wiki-content">
           <div id="characterList" class="space-y-3"></div>
           <div id="characterEmpty" class="empty-state compact">
@@ -196,7 +181,6 @@
             <p class="text-charcoal-600 text-sm">No characters yet</p>
           </div>
         </div>
-        <!-- Locations -->
         <div id="wikiLocations" class="wiki-content" style="display:none">
           <div id="locationList" class="grid grid-cols-2 gap-3"></div>
           <div id="locationEmpty" class="empty-state compact">
@@ -204,7 +188,6 @@
             <p class="text-charcoal-600 text-sm">No places yet</p>
           </div>
         </div>
-        <!-- Jokes -->
         <div id="wikiJokes" class="wiki-content" style="display:none">
           <div id="jokeList" class="space-y-3"></div>
           <div id="jokeEmpty" class="empty-state compact">
@@ -218,13 +201,11 @@
       <div id="screenLetters" class="screen p-5" style="display:none">
         <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Letters</h2>
         <p class="text-charcoal-600 text-sm font-light mb-5">Words for the heart</p>
-        <!-- Letters Tabs -->
         <div class="tab-bar mb-5">
           <button onclick="showLetterTab('openwhen')" class="tab-btn active" data-tab="openwhen"><i class="fa-solid fa-envelope mr-1.5"></i>Open When</button>
           <button onclick="showLetterTab('capsules')" class="tab-btn" data-tab="capsules"><i class="fa-solid fa-hourglass-half mr-1.5"></i>Capsules</button>
           <button onclick="showLetterTab('firsts')" class="tab-btn" data-tab="firsts"><i class="fa-solid fa-star mr-1.5"></i>Firsts</button>
         </div>
-        <!-- Open When -->
         <div id="letterOpenWhen" class="letter-content">
           <div id="openWhenList" class="grid grid-cols-2 gap-3"></div>
           <div id="openWhenEmpty" class="empty-state compact">
@@ -232,7 +213,6 @@
             <p class="text-charcoal-600 text-sm">No letters yet</p>
           </div>
         </div>
-        <!-- Time Capsules -->
         <div id="letterCapsules" class="letter-content" style="display:none">
           <div id="capsuleList" class="grid grid-cols-2 gap-3"></div>
           <div id="capsuleEmpty" class="empty-state compact">
@@ -240,7 +220,6 @@
             <p class="text-charcoal-600 text-sm">No capsules yet</p>
           </div>
         </div>
-        <!-- Firsts -->
         <div id="letterFirsts" class="letter-content" style="display:none">
           <div id="firstsTimeline" class="firsts-line"></div>
           <div id="firstsEmpty" class="empty-state compact">
@@ -255,7 +234,6 @@
         <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Settings</h2>
         <p class="text-charcoal-600 text-sm font-light mb-5">Make LoveLore yours</p>
         <div class="space-y-3">
-          <!-- Start Date -->
           <div class="settings-card">
             <div class="flex items-center gap-3 mb-3">
               <div class="settings-icon bg-blush-100"><i class="fa-solid fa-calendar-heart text-blush-400"></i></div>
@@ -266,7 +244,6 @@
             </div>
             <input type="date" id="startDateInput" class="input-field" />
           </div>
-          <!-- Change PIN -->
           <div class="settings-card">
             <div class="flex items-center gap-3 mb-3">
               <div class="settings-icon bg-sage-100"><i class="fa-solid fa-lock text-sage-400"></i></div>
@@ -278,7 +255,6 @@
             <input type="password" id="newPinInput" maxlength="4" placeholder="New 4-digit PIN" class="input-field" />
             <button onclick="changePin()" class="btn-secondary mt-2">Update PIN</button>
           </div>
-          <!-- Fight Log -->
           <div class="settings-card">
             <div class="flex items-center gap-3 mb-3">
               <div class="settings-icon bg-sage-100"><i class="fa-solid fa-handshake text-sage-400"></i></div>
@@ -290,7 +266,6 @@
             <div id="fightLogList" class="space-y-3 mb-3"></div>
             <button onclick="showModal('modalFightLog')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Entry</button>
           </div>
-          <!-- Bucket List -->
           <div class="settings-card">
             <div class="flex items-center gap-3 mb-3">
               <div class="settings-icon bg-blush-100"><i class="fa-solid fa-list-check text-blush-400"></i></div>
@@ -303,7 +278,6 @@
             <div id="bucketListCompleted" class="space-y-2 mb-3"></div>
             <button onclick="showModal('modalBucketList')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
           </div>
-          <!-- Photo Grid -->
           <div class="settings-card">
             <div class="flex items-center gap-3 mb-3">
               <div class="settings-icon bg-warmgray-100"><i class="fa-solid fa-images text-charcoal-700"></i></div>
@@ -314,7 +288,6 @@
             </div>
             <button onclick="showModal('modalPhotoGrid')" class="btn-secondary"><i class="fa-solid fa-images mr-1"></i> View Gallery</button>
           </div>
-          <!-- Lock App -->
           <div class="settings-card">
             <button onclick="lockApp()" class="w-full flex items-center justify-center gap-2 bg-charcoal-800 text-white font-semibold py-3 px-4 rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.97] active:bg-charcoal-900">
               <i class="fa-solid fa-lock"></i> Lock App
@@ -325,12 +298,10 @@
 
     </main>
 
-    <!-- FAB: Add Button -->
     <button id="fabAdd" onclick="showAddMenu()" class="fab-btn">
       <i class="fa-solid fa-plus"></i>
     </button>
 
-    <!-- Bottom Navigation -->
     <nav class="bottom-nav">
       <div class="nav-indicator" id="navIndicator"></div>
       <button onclick="navigate('home')" class="nav-btn active" data-screen="home">
@@ -406,7 +377,6 @@
   <!-- MODALS                                       -->
   <!-- ============================================ -->
 
-  <!-- Modal: Add Timeline Memory -->
   <div id="modalTimeline" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalTimeline')"></div>
     <div class="modal-sheet">
@@ -432,7 +402,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Character -->
   <div id="modalCharacter" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalCharacter')"></div>
     <div class="modal-sheet">
@@ -455,7 +424,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Location -->
   <div id="modalLocation" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalLocation')"></div>
     <div class="modal-sheet">
@@ -476,7 +444,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Inside Joke -->
   <div id="modalJoke" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalJoke')"></div>
     <div class="modal-sheet">
@@ -494,7 +461,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Open When Letter -->
   <div id="modalOpenWhen" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalOpenWhen')"></div>
     <div class="modal-sheet">
@@ -515,7 +481,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Time Capsule -->
   <div id="modalCapsule" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalCapsule')"></div>
     <div class="modal-sheet">
@@ -538,7 +503,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add First Milestone -->
   <div id="modalFirst" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalFirst')"></div>
     <div class="modal-sheet">
@@ -556,7 +520,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Fight Log -->
   <div id="modalFightLog" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalFightLog')"></div>
     <div class="modal-sheet">
@@ -574,7 +537,6 @@
     </div>
   </div>
 
-  <!-- Modal: Add Bucket List Item -->
   <div id="modalBucketList" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalBucketList')"></div>
     <div class="modal-sheet">
@@ -591,7 +553,6 @@
     </div>
   </div>
 
-  <!-- Modal: Photo Grid -->
   <div id="modalPhotoGrid" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalPhotoGrid')"></div>
     <div class="modal-sheet">
@@ -610,7 +571,6 @@
     </div>
   </div>
 
-  <!-- Modal: Character Detail -->
   <div id="modalCharDetail" class="modal" style="display:none">
     <div class="modal-overlay" onclick="hideModal('modalCharDetail')"></div>
     <div class="modal-sheet">
