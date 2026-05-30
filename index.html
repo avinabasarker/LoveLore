@@ -2,47 +2,645 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,
-  initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>LoveLore</title>
+  <meta name="description" content="Your private relationship wiki" />
+  <meta name="theme-color" content="#FFF0F3" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: {
-        blush: { 100:'#FFF0F3', 200:'#FFCCD5',
-          300:'#FF8FA3', 400:'#FF4D6D' },
-        sage: { 100:'#F0F4EF', 200:'#D8E8D4',
-          300:'#A3C48B', 400:'#6B9E4F' },
-        cream: { 50:'#FFFDF7', 100:'#FFF8E7' },
-        charcoal: { 700:'#3D3D3D', 800:'#2B2B2B',
-          900:'#1A1A1A' }
-      },
-      fontFamily: { Inter: ['Inter','sans-serif'] }
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            blush: { 50:'#FFF5F7', 100:'#FFF0F3', 200:'#FFCCD5', 300:'#FF8FA3', 400:'#FF4D6D', 500:'#E5383B' },
+            sage: { 50:'#F6FAF4', 100:'#F0F4EF', 200:'#D8E8D4', 300:'#A3C48B', 400:'#6B9E4F', 500:'#4A7C2E' },
+            cream: { 25:'#FFFEFB', 50:'#FFFDF7', 100:'#FFF8E7', 200:'#FFEFCC' },
+            charcoal: { 600:'#555555', 700:'#3D3D3D', 800:'#2B2B2B', 900:'#1A1A1A' },
+            warmgray: { 100:'#F5F0EB', 200:'#E8E0D8' }
+          },
+          fontFamily: { Inter: ['Inter','sans-serif'] },
+          boxShadow: {
+            'card': '0 2px 15px -3px rgba(255,77,109,0.08), 0 4px 6px -4px rgba(0,0,0,0.05)',
+            'card-hover': '0 8px 30px -5px rgba(255,77,109,0.15), 0 4px 6px -4px rgba(0,0,0,0.08)',
+            'glow': '0 0 20px rgba(255,77,109,0.3)',
+            'soft': '0 1px 3px rgba(0,0,0,0.04)',
+          }
+        }
+      }
     }
-  }
-}
-</script>
+  </script>
 
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href=
-  "https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com
-  /css2?family=Inter:wght@400;500;600;700
-  &display=swap" rel="stylesheet" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
 
-  <!-- Font Awesome icons for nav bar -->
-  <link rel="stylesheet" href=
-  "https://cdnjs.cloudflare.com/ajax/libs
-  /font-awesome/6.5.0/css/all.min.css" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 
-  <!-- Our custom styles -->
-  <link rel="stylesheet" href="css/style.css"
-  />
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/style.css" />
 </head>
-<body class="bg-cream-50 font-Inter">
+<body class="bg-cream-50 font-Inter overflow-hidden h-screen select-none">
+
+  <!-- ============================================ -->
+  <!-- SCREEN 1: LOCK SCREEN                       -->
+  <!-- ============================================ -->
+  <div id="lockScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden">
+    <!-- Animated gradient background -->
+    <div class="absolute inset-0 bg-gradient-animated"></div>
+    <!-- Floating hearts decoration -->
+    <div class="floating-hearts absolute inset-0 pointer-events-none overflow-hidden">
+      <i class="fa-solid fa-heart floating-heart" style="left:10%;animation-delay:0s;font-size:12px;opacity:0.15"></i>
+      <i class="fa-solid fa-heart floating-heart" style="left:25%;animation-delay:2s;font-size:8px;opacity:0.1"></i>
+      <i class="fa-solid fa-heart floating-heart" style="left:45%;animation-delay:4s;font-size:16px;opacity:0.12"></i>
+      <i class="fa-solid fa-heart floating-heart" style="left:65%;animation-delay:1s;font-size:10px;opacity:0.1"></i>
+      <i class="fa-solid fa-heart floating-heart" style="left:80%;animation-delay:3s;font-size:14px;opacity:0.13"></i>
+      <i class="fa-solid fa-heart floating-heart" style="left:90%;animation-delay:5s;font-size:9px;opacity:0.08"></i>
+    </div>
+
+    <div class="relative z-10 text-center mb-8">
+      <div class="heart-pulse inline-block mb-4">
+        <i class="fa-solid fa-heart text-blush-400 text-5xl"></i>
+      </div>
+      <h1 class="text-4xl font-extrabold text-charcoal-800 tracking-tight mb-1">LoveLore</h1>
+      <p class="text-charcoal-600 text-sm font-light tracking-wide">Your story, kept safe</p>
+    </div>
+
+    <!-- PIN Dots -->
+    <div id="pinDots" class="relative z-10 flex gap-4 mb-4">
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+    </div>
+    <p id="pinError" class="relative z-10 text-blush-400 text-xs mb-6 h-5 font-medium tracking-wide"></p>
+
+    <!-- PIN Pad -->
+    <div id="pinPad" class="relative z-10 grid grid-cols-3 gap-3 w-72">
+      <button onclick="pinInput('1')" class="pin-btn"><span>1</span></button>
+      <button onclick="pinInput('2')" class="pin-btn"><span>2</span><small>ABC</small></button>
+      <button onclick="pinInput('3')" class="pin-btn"><span>3</span><small>DEF</small></button>
+      <button onclick="pinInput('4')" class="pin-btn"><span>4</span><small>GHI</small></button>
+      <button onclick="pinInput('5')" class="pin-btn"><span>5</span><small>JKL</small></button>
+      <button onclick="pinInput('6')" class="pin-btn"><span>6</span><small>MNO</small></button>
+      <button onclick="pinInput('7')" class="pin-btn"><span>7</span><small>PQRS</small></button>
+      <button onclick="pinInput('8')" class="pin-btn"><span>8</span><small>TUV</small></button>
+      <button onclick="pinInput('9')" class="pin-btn"><span>9</span><small>WXYZ</small></button>
+      <div></div>
+      <button onclick="pinInput('0')" class="pin-btn"><span>0</span></button>
+      <button onclick="pinDelete()" class="pin-btn-delete"><i class="fa-solid fa-delete-left text-lg"></i></button>
+    </div>
+    <button id="setPinBtn" onclick="setFirstPin()" class="relative z-10 hidden mt-8 btn-primary">Set PIN</button>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SCREEN 2: PARTNER SELECT                     -->
+  <!-- ============================================ -->
+  <div id="partnerSelect" class="fixed inset-0 z-40 flex-col items-center justify-center overflow-hidden" style="display:none">
+    <div class="absolute inset-0 bg-gradient-to-br from-sage-50 via-cream-50 to-blush-50"></div>
+    <div class="relative z-10 text-center mb-10">
+      <h2 class="text-3xl font-bold text-charcoal-800 mb-2">Who's here?</h2>
+      <p class="text-charcoal-600 text-sm font-light">This tags your new entries</p>
+    </div>
+    <div class="relative z-10 flex gap-5">
+      <button onclick="selectPartner('1')" class="partner-card group">
+        <div class="partner-icon-wrap bg-blush-100 group-hover:bg-blush-200">
+          <i class="fa-solid fa-user text-blush-300 text-2xl group-hover:scale-110 transition-transform duration-300"></i>
+        </div>
+        <span class="font-semibold text-charcoal-800 mt-3 block">Partner 1</span>
+      </button>
+      <button onclick="selectPartner('2')" class="partner-card group">
+        <div class="partner-icon-wrap bg-sage-100 group-hover:bg-sage-200">
+          <i class="fa-solid fa-user text-sage-300 text-2xl group-hover:scale-110 transition-transform duration-300"></i>
+        </div>
+        <span class="font-semibold text-charcoal-800 mt-3 block">Partner 2</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MAIN APP SHELL                               -->
+  <!-- ============================================ -->
+  <div id="appShell" class="flex flex-col h-screen" style="display:none">
+
+    <!-- Top Bar -->
+    <header class="flex items-center justify-between px-5 py-3 bg-white/70 backdrop-blur-xl border-b border-warmgray-100 z-10">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-heart text-blush-400 text-sm"></i>
+        <h1 class="text-lg font-bold text-charcoal-800 tracking-tight">LoveLore</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="syncIndicator" class="sync-dot" title="Synced"></span>
+        <span id="activePartner" class="partner-badge"></span>
+      </div>
+    </header>
+
+    <!-- Scrollable Content Area -->
+    <main id="mainContent" class="flex-1 overflow-y-auto overflow-x-hidden pb-24 scroll-smooth">
+
+      <!-- HOME SCREEN -->
+      <div id="screenHome" class="screen page-enter p-5">
+        <!-- Nerd Stats Dashboard -->
+        <div class="grid grid-cols-3 gap-3 mb-6">
+          <div class="stat-card stat-blush">
+            <i class="fa-solid fa-heart text-blush-300 text-xs mb-1 block"></i>
+            <p id="statDays" class="stat-number text-blush-400">0</p>
+            <p class="stat-label">Days Together</p>
+          </div>
+          <div class="stat-card stat-sage">
+            <i class="fa-solid fa-bookmark text-sage-300 text-xs mb-1 block"></i>
+            <p id="statMemories" class="stat-number text-sage-400">0</p>
+            <p class="stat-label">Memories</p>
+          </div>
+          <div class="stat-card stat-warm">
+            <i class="fa-solid fa-camera text-blush-200 text-xs mb-1 block"></i>
+            <p id="statPhotos" class="stat-number text-charcoal-700">0</p>
+            <p class="stat-label">Photos</p>
+          </div>
+        </div>
+        <!-- Section Header -->
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold text-charcoal-800">Our Timeline</h2>
+        </div>
+        <!-- Timeline Feed -->
+        <div id="timelineFeed" class="space-y-4"></div>
+        <!-- Empty State -->
+        <div id="timelineEmpty" class="empty-state">
+          <div class="empty-icon-wrap">
+            <i class="fa-solid fa-book-open"></i>
+          </div>
+          <p class="text-charcoal-800 font-semibold mb-1">Your story starts here</p>
+          <p class="text-charcoal-600 text-sm">Tap the + button to add your first memory</p>
+        </div>
+      </div>
+
+      <!-- WIKI SCREEN -->
+      <div id="screenWiki" class="screen p-5" style="display:none">
+        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Wiki</h2>
+        <p class="text-charcoal-600 text-sm font-light mb-5">The encyclopedia of us</p>
+        <!-- Wiki Tabs -->
+        <div class="tab-bar mb-5">
+          <button onclick="showWikiTab('characters')" class="tab-btn active" data-tab="characters"><i class="fa-solid fa-user-group mr-1.5"></i>Characters</button>
+          <button onclick="showWikiTab('locations')" class="tab-btn" data-tab="locations"><i class="fa-solid fa-map-pin mr-1.5"></i>Places</button>
+          <button onclick="showWikiTab('jokes')" class="tab-btn" data-tab="jokes"><i class="fa-solid fa-face-laugh-beam mr-1.5"></i>Jokes</button>
+        </div>
+        <!-- Characters -->
+        <div id="wikiCharacters" class="wiki-content">
+          <div id="characterList" class="space-y-3"></div>
+          <div id="characterEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-users"></i></div>
+            <p class="text-charcoal-600 text-sm">No characters yet</p>
+          </div>
+        </div>
+        <!-- Locations -->
+        <div id="wikiLocations" class="wiki-content" style="display:none">
+          <div id="locationList" class="grid grid-cols-2 gap-3"></div>
+          <div id="locationEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-map-pin"></i></div>
+            <p class="text-charcoal-600 text-sm">No places yet</p>
+          </div>
+        </div>
+        <!-- Jokes -->
+        <div id="wikiJokes" class="wiki-content" style="display:none">
+          <div id="jokeList" class="space-y-3"></div>
+          <div id="jokeEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-face-laugh-beam"></i></div>
+            <p class="text-charcoal-600 text-sm">No inside jokes yet</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- LETTERS SCREEN -->
+      <div id="screenLetters" class="screen p-5" style="display:none">
+        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Letters</h2>
+        <p class="text-charcoal-600 text-sm font-light mb-5">Words for the heart</p>
+        <!-- Letters Tabs -->
+        <div class="tab-bar mb-5">
+          <button onclick="showLetterTab('openwhen')" class="tab-btn active" data-tab="openwhen"><i class="fa-solid fa-envelope mr-1.5"></i>Open When</button>
+          <button onclick="showLetterTab('capsules')" class="tab-btn" data-tab="capsules"><i class="fa-solid fa-hourglass-half mr-1.5"></i>Capsules</button>
+          <button onclick="showLetterTab('firsts')" class="tab-btn" data-tab="firsts"><i class="fa-solid fa-star mr-1.5"></i>Firsts</button>
+        </div>
+        <!-- Open When -->
+        <div id="letterOpenWhen" class="letter-content">
+          <div id="openWhenList" class="grid grid-cols-2 gap-3"></div>
+          <div id="openWhenEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-envelope"></i></div>
+            <p class="text-charcoal-600 text-sm">No letters yet</p>
+          </div>
+        </div>
+        <!-- Time Capsules -->
+        <div id="letterCapsules" class="letter-content" style="display:none">
+          <div id="capsuleList" class="grid grid-cols-2 gap-3"></div>
+          <div id="capsuleEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-hourglass-half"></i></div>
+            <p class="text-charcoal-600 text-sm">No capsules yet</p>
+          </div>
+        </div>
+        <!-- Firsts -->
+        <div id="letterFirsts" class="letter-content" style="display:none">
+          <div id="firstsTimeline" class="firsts-line"></div>
+          <div id="firstsEmpty" class="empty-state compact">
+            <div class="empty-icon-wrap small"><i class="fa-solid fa-star"></i></div>
+            <p class="text-charcoal-600 text-sm">No milestones yet</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS SCREEN -->
+      <div id="screenSettings" class="screen p-5" style="display:none">
+        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Settings</h2>
+        <p class="text-charcoal-600 text-sm font-light mb-5">Make LoveLore yours</p>
+        <div class="space-y-3">
+          <!-- Start Date -->
+          <div class="settings-card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="settings-icon bg-blush-100"><i class="fa-solid fa-calendar-heart text-blush-400"></i></div>
+              <div>
+                <p class="text-sm font-semibold text-charcoal-800">Anniversary Date</p>
+                <p class="text-xs text-charcoal-600">When did it all begin?</p>
+              </div>
+            </div>
+            <input type="date" id="startDateInput" class="input-field" />
+          </div>
+          <!-- Change PIN -->
+          <div class="settings-card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="settings-icon bg-sage-100"><i class="fa-solid fa-lock text-sage-400"></i></div>
+              <div>
+                <p class="text-sm font-semibold text-charcoal-800">Change PIN</p>
+                <p class="text-xs text-charcoal-600">Keep it secret, keep it safe</p>
+              </div>
+            </div>
+            <input type="password" id="newPinInput" maxlength="4" placeholder="New 4-digit PIN" class="input-field" />
+            <button onclick="changePin()" class="btn-secondary mt-2">Update PIN</button>
+          </div>
+          <!-- Fight Log -->
+          <div class="settings-card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="settings-icon bg-sage-100"><i class="fa-solid fa-handshake text-sage-400"></i></div>
+              <div>
+                <p class="text-sm font-semibold text-charcoal-800">Fight Log</p>
+                <p class="text-xs text-charcoal-600">Resolution, not blame</p>
+              </div>
+            </div>
+            <div id="fightLogList" class="space-y-3 mb-3"></div>
+            <button onclick="showModal('modalFightLog')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Entry</button>
+          </div>
+          <!-- Bucket List -->
+          <div class="settings-card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="settings-icon bg-blush-100"><i class="fa-solid fa-list-check text-blush-400"></i></div>
+              <div>
+                <p class="text-sm font-semibold text-charcoal-800">Our Bucket List</p>
+                <p class="text-xs text-charcoal-600">Dreams to chase together</p>
+              </div>
+            </div>
+            <div id="bucketListActive" class="space-y-2 mb-2"></div>
+            <div id="bucketListCompleted" class="space-y-2 mb-3"></div>
+            <button onclick="showModal('modalBucketList')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
+          </div>
+          <!-- Photo Grid -->
+          <div class="settings-card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="settings-icon bg-warmgray-100"><i class="fa-solid fa-images text-charcoal-700"></i></div>
+              <div>
+                <p class="text-sm font-semibold text-charcoal-800">Photo Gallery</p>
+                <p class="text-xs text-charcoal-600">All your moments, one place</p>
+              </div>
+            </div>
+            <button onclick="showModal('modalPhotoGrid')" class="btn-secondary"><i class="fa-solid fa-images mr-1"></i> View Gallery</button>
+          </div>
+          <!-- Lock App -->
+          <div class="settings-card">
+            <button onclick="lockApp()" class="w-full flex items-center justify-center gap-2 bg-charcoal-800 text-white font-semibold py-3 px-4 rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.97] active:bg-charcoal-900">
+              <i class="fa-solid fa-lock"></i> Lock App
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- FAB: Add Button -->
+    <button id="fabAdd" onclick="showAddMenu()" class="fab-btn">
+      <i class="fa-solid fa-plus"></i>
+    </button>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <div class="nav-indicator" id="navIndicator"></div>
+      <button onclick="navigate('home')" class="nav-btn active" data-screen="home">
+        <i class="fa-solid fa-timeline"></i>
+        <span>Home</span>
+      </button>
+      <button onclick="navigate('wiki')" class="nav-btn" data-screen="wiki">
+        <i class="fa-solid fa-book"></i>
+        <span>Wiki</span>
+      </button>
+      <button onclick="navigate('letters')" class="nav-btn" data-screen="letters">
+        <i class="fa-solid fa-envelope"></i>
+        <span>Letters</span>
+      </button>
+      <button onclick="navigate('settings')" class="nav-btn" data-screen="settings">
+        <i class="fa-solid fa-gear"></i>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ============================================ -->
+  <!-- ADD MENU                                     -->
+  <!-- ============================================ -->
+  <div id="addMenu" class="fixed inset-0 z-40" style="display:none">
+    <div class="absolute inset-0 bg-charcoal-900/50 backdrop-blur-sm" onclick="hideAddMenu()"></div>
+    <div class="add-menu-panel absolute bottom-0 left-0 right-0 bg-white rounded-t-[2rem] p-6 z-50 transform translate-y-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]" id="addMenuPanel">
+      <div class="w-10 h-1 bg-warmgray-200 rounded-full mx-auto mb-5"></div>
+      <h3 class="text-lg font-bold text-charcoal-800 mb-4">Add Something New</h3>
+      <div class="grid grid-cols-3 gap-3">
+        <button onclick="showModal('modalTimeline');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
+          <i class="fa-solid fa-clock-rotate-left text-xl mb-1"></i>
+          <span>Memory</span>
+        </button>
+        <button onclick="showModal('modalCharacter');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
+          <i class="fa-solid fa-user text-xl mb-1"></i>
+          <span>Character</span>
+        </button>
+        <button onclick="showModal('modalLocation');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
+          <i class="fa-solid fa-map-pin text-xl mb-1"></i>
+          <span>Place</span>
+        </button>
+        <button onclick="showModal('modalJoke');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
+          <i class="fa-solid fa-face-laugh-beam text-xl mb-1"></i>
+          <span>Joke</span>
+        </button>
+        <button onclick="showModal('modalOpenWhen');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
+          <i class="fa-solid fa-envelope text-xl mb-1"></i>
+          <span>Letter</span>
+        </button>
+        <button onclick="showModal('modalCapsule');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
+          <i class="fa-solid fa-hourglass-half text-xl mb-1"></i>
+          <span>Capsule</span>
+        </button>
+        <button onclick="showModal('modalFirst');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
+          <i class="fa-solid fa-star text-xl mb-1"></i>
+          <span>First</span>
+        </button>
+        <button onclick="showModal('modalFightLog');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
+          <i class="fa-solid fa-handshake text-xl mb-1"></i>
+          <span>Fight Log</span>
+        </button>
+        <button onclick="showModal('modalBucketList');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
+          <i class="fa-solid fa-list-check text-xl mb-1"></i>
+          <span>Bucket</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MODALS                                       -->
+  <!-- ============================================ -->
+
+  <!-- Modal: Add Timeline Memory -->
+  <div id="modalTimeline" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalTimeline')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Memory</h3>
+        <button onclick="hideModal('modalTimeline')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="date" id="memoryDate" class="input-field" />
+        <input type="text" id="memoryTitle" placeholder="Give this memory a title" class="input-field" />
+        <textarea id="memoryDesc" rows="3" placeholder="What happened..." class="input-field resize-none"></textarea>
+        <label class="file-upload">
+          <input type="file" id="memoryPhoto" accept="image/*" />
+          <i class="fa-solid fa-camera"></i> Add Photo
+        </label>
+        <label class="file-upload sage">
+          <input type="file" id="memoryAudio" accept="audio/*" />
+          <i class="fa-solid fa-microphone"></i> Add Audio
+        </label>
+        <button onclick="saveMemory()" class="btn-primary w-full">Save Memory</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Character -->
+  <div id="modalCharacter" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalCharacter')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Character</h3>
+        <button onclick="hideModal('modalCharacter')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="charName" placeholder="Their name" class="input-field" />
+        <input type="text" id="charRole" placeholder="Role (e.g. My Partner, My Sister)" class="input-field" />
+        <textarea id="charBio" rows="3" placeholder="Tell us about them..." class="input-field resize-none"></textarea>
+        <label class="file-upload">
+          <input type="file" id="charPhoto" accept="image/*" />
+          <i class="fa-solid fa-camera"></i> Add Photo
+        </label>
+        <input type="text" id="charTags" placeholder="Tags (comma separated)" class="input-field" />
+        <button onclick="saveCharacter()" class="btn-secondary w-full">Save Character</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Location -->
+  <div id="modalLocation" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalLocation')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Place</h3>
+        <button onclick="hideModal('modalLocation')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="locName" placeholder="Location name" class="input-field" />
+        <textarea id="locHistory" rows="3" placeholder="Our history here..." class="input-field resize-none"></textarea>
+        <label class="file-upload">
+          <input type="file" id="locPhoto" accept="image/*" />
+          <i class="fa-solid fa-camera"></i> Add Cover Photo
+        </label>
+        <button onclick="saveLocation()" class="btn-secondary w-full">Save Place</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Inside Joke -->
+  <div id="modalJoke" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalJoke')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Inside Joke</h3>
+        <button onclick="hideModal('modalJoke')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="jokeTerm" placeholder="The term or phrase" class="input-field" />
+        <input type="text" id="jokeDef" placeholder="Definition" class="input-field" />
+        <textarea id="jokeOrigin" rows="3" placeholder="Origin story..." class="input-field resize-none"></textarea>
+        <button onclick="saveJoke()" class="btn-secondary w-full">Save Joke</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Open When Letter -->
+  <div id="modalOpenWhen" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalOpenWhen')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Letter</h3>
+        <button onclick="hideModal('modalOpenWhen')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="letterTitle" placeholder='Title (e.g. "Open when you miss me")' class="input-field" />
+        <textarea id="letterBody" rows="5" placeholder="Write your heart out..." class="input-field resize-none"></textarea>
+        <label class="file-upload">
+          <input type="file" id="letterPhoto" accept="image/*" />
+          <i class="fa-solid fa-camera"></i> Attach Photo
+        </label>
+        <button onclick="saveOpenWhen()" class="btn-primary w-full">Seal Letter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Time Capsule -->
+  <div id="modalCapsule" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalCapsule')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Time Capsule</h3>
+        <button onclick="hideModal('modalCapsule')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="capsuleTitle" placeholder="Capsule title" class="input-field" />
+        <textarea id="capsuleBody" rows="5" placeholder="A message for the future..." class="input-field resize-none"></textarea>
+        <label class="text-xs font-semibold text-charcoal-700 block">Unlocks On</label>
+        <input type="datetime-local" id="capsuleDate" class="input-field" />
+        <label class="file-upload">
+          <input type="file" id="capsulePhoto" accept="image/*" />
+          <i class="fa-solid fa-camera"></i> Attach Photo
+        </label>
+        <button onclick="saveCapsule()" class="btn-primary w-full">Bury Capsule</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add First Milestone -->
+  <div id="modalFirst" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalFirst')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Milestone</h3>
+        <button onclick="hideModal('modalFirst')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="date" id="firstDate" class="input-field" />
+        <input type="text" id="firstTitle" placeholder='Title (e.g. "First Date")' class="input-field" />
+        <textarea id="firstDesc" rows="2" placeholder="The story behind it..." class="input-field resize-none"></textarea>
+        <button onclick="saveFirst()" class="btn-primary w-full">Save Milestone</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Fight Log -->
+  <div id="modalFightLog" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalFightLog')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>Resolution Entry</h3>
+        <button onclick="hideModal('modalFightLog')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <textarea id="fightWhat" rows="2" placeholder="What happened..." class="input-field sage resize-none"></textarea>
+        <textarea id="fightResolved" rows="2" placeholder="How we resolved it..." class="input-field sage resize-none"></textarea>
+        <textarea id="fightLesson" rows="2" placeholder="Lesson learned..." class="input-field sage resize-none"></textarea>
+        <button onclick="saveFightLog()" class="btn-secondary w-full">Save Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Bucket List Item -->
+  <div id="modalBucketList" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalBucketList')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>New Bucket List Item</h3>
+        <button onclick="hideModal('modalBucketList')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <input type="text" id="bucketTitle" placeholder="What do we want to do?" class="input-field" />
+        <textarea id="bucketDetails" rows="2" placeholder="Details..." class="input-field resize-none"></textarea>
+        <button onclick="saveBucketItem()" class="btn-primary w-full">Add to List</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Photo Grid -->
+  <div id="modalPhotoGrid" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalPhotoGrid')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3>Photo Gallery</h3>
+        <button onclick="hideModal('modalPhotoGrid')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div id="photoGridContent" class="grid grid-cols-3 gap-1.5"></div>
+        <div id="photoGridEmpty" class="empty-state compact">
+          <div class="empty-icon-wrap small"><i class="fa-solid fa-image"></i></div>
+          <p class="text-charcoal-600 text-sm">No photos yet</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Character Detail -->
+  <div id="modalCharDetail" class="modal" style="display:none">
+    <div class="modal-overlay" onclick="hideModal('modalCharDetail')"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <h3 id="charDetailName">Character</h3>
+        <button onclick="hideModal('modalCharDetail')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-center mb-4">
+          <img id="charDetailImg" src="" alt="" class="w-24 h-24 rounded-full object-cover mx-auto mb-3 shadow-card ring-4 ring-blush-100" />
+          <p id="charDetailRole" class="text-sm font-medium text-blush-400"></p>
+        </div>
+        <p id="charDetailBio" class="text-sm text-charcoal-700 leading-relaxed mb-4"></p>
+        <h4 class="text-xs font-bold text-charcoal-800 uppercase tracking-wider mb-2">Related Memories</h4>
+        <div id="charDetailEvents" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SCRIPTS                                      -->
+  <!-- ============================================ -->
+  <script src="js/utils.js"></script>
+  <script src="js/crypto.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/app.js"></script>
+
 </body>
 </html>
