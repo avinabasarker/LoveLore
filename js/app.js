@@ -504,7 +504,9 @@ function clearModal(modalId) {
 // ============================================
 
 async function renderTimeline() {
-  var items = await dbGetAllSorted('memories', 'date', true);
+  var allItems = await dbGetAllSorted('memories', 'date', true);
+  // Filter out gallery-only photos (they belong in gallery, not timeline)
+  var items = allItems.filter(function(item) { return item.type !== 'gallery_photo'; });
   var feed = document.getElementById('timelineFeed');
   var empty = document.getElementById('timelineEmpty');
 
@@ -567,7 +569,14 @@ async function renderGallery() {
   var grid = document.getElementById('galleryGrid');
   var empty = document.getElementById('galleryEmpty');
 
-  if (allPhotos.length === 0) { grid.innerHTML = ''; empty.style.display = 'flex'; return; }
+  // Sort photos by date (newest first)
+  allPhotos.sort(function(a, b) {
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return new Date(b.date) - new Date(a.date);
+  });
+
+  if (allPhotos.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
   empty.style.display = 'none';
 
   grid.innerHTML = allPhotos.map(function(p, idx) {
@@ -965,7 +974,9 @@ async function updateNerdStats() {
   if (startDate) daysEl.textContent = daysBetween(startDate);
 
   var memories = await dbGetAll('memories');
-  memEl.textContent = memories.length;
+  // Count only actual memories, not gallery-only photos
+  var realMemories = memories.filter(function(m) { return m.type !== 'gallery_photo'; });
+  memEl.textContent = realMemories.length;
 
   var photoCount = 0;
   memories.forEach(function(m) { if (m.photo) photoCount++; });
@@ -975,6 +986,8 @@ async function updateNerdStats() {
   capsules.forEach(function(c) { if (c.photo) photoCount++; });
   var locations = await dbGetAll('locations');
   locations.forEach(function(l) { if (l.coverPhoto) photoCount++; });
+  var characters = await dbGetAll('characters');
+  characters.forEach(function(c) { if (c.photo) photoCount++; });
   photoEl.textContent = photoCount;
 }
 
@@ -1019,7 +1032,7 @@ window.addEventListener('DOMContentLoaded', function() {
     document.getElementById('setPinBtn').classList.add('hidden');
   }
 
-  // Pre-set anniversary date
+  // Pre-set anniversary date (May 29, 2026 at 1:04 AM)
   if (!getStartDate()) {
     setStartDate('2026-05-29');
   }
