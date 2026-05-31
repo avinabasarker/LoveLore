@@ -1,19 +1,17 @@
 /* ============================================ */
 /* LoveLore — Firebase Configuration            */
+/* Media stored in Firestore as encrypted       */
+/* base64 (no Storage bucket needed = free)     */
 /* ============================================ */
 
-// Firebase SDK (loaded via CDN in this file)
-// We use Firestore for structured data and
-// Firebase Storage for media files.
-
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBYzWLaHWmLCwiqBLSBnqOYC0MjHqu2OS8",
+  authDomain: "lovelore-f99fb.firebaseapp.com",
+  projectId: "lovelore-f99fb",
+  storageBucket: "lovelore-f99fb.firebasestorage.app",
+  messagingSenderId: "1063866736828",
+  appId: "1:1063866736828:web:7f9f0aaa5cc0ff0d5370b9",
+  measurementId: "G-WFW9FFEJ23"
 };
 
 // ---- Load Firebase SDKs dynamically ----
@@ -27,8 +25,7 @@ function loadFirebaseSDK() {
     const scripts = [
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
       'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js',
-      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
-      'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js'
+      'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js'
     ];
     let loaded = 0;
     scripts.forEach((src) => {
@@ -48,25 +45,23 @@ function loadFirebaseSDK() {
 
 // ---- Initialize Firebase ----
 
-let db = null;
-let storage = null;
-let auth = null;
+let fdb = null;
+let fAuth = null;
 
 function initFirebase() {
   if (!firebase.apps.length) {
     firebase.initializeApp(FIREBASE_CONFIG);
   }
-  db = firebase.firestore();
-  auth = firebase.auth();
-  storage = firebase.storage();
+  fdb = firebase.firestore();
+  fAuth = firebase.auth();
 
-  // Enable offline persistence
-  db.enablePersistence({ synchronizeTabs: true })
+  // Enable offline persistence (Firebase's own cache)
+  fdb.enablePersistence({ synchronizeTabs: true })
     .catch((err) => {
       if (err.code === 'failed-precondition') {
-        console.warn('Firestore persistence: multiple tabs open');
+        console.warn('Firestore: multiple tabs open');
       } else if (err.code === 'unimplemented') {
-        console.warn('Firestore persistence: browser not supported');
+        console.warn('Firestore: persistence not supported');
       }
     });
 
@@ -77,7 +72,7 @@ function initFirebase() {
 
 async function signInAnonymously() {
   try {
-    const result = await auth.signInAnonymously();
+    const result = await fAuth.signInAnonymously();
     console.log('Signed in:', result.user.uid);
     return result.user;
   } catch (e) {
@@ -88,30 +83,40 @@ async function signInAnonymously() {
 
 // ---- Firestore Helpers ----
 
-async function firestoreSet(collection, docId, data) {
-  if (!db) return;
+// Map local store names to Firestore collection names
+const COLLECTION_MAP = {
+  memories: 'memories',
+  characters: 'characters',
+  locations: 'locations',
+  jokes: 'jokes',
+  letters: 'letters',
+  capsules: 'capsules',
+  firsts: 'firsts',
+  fightlog: 'fightlog',
+  bucketlist: 'bucketlist',
+  settings: 'settings'
+};
+
+function getCollection(storeName) {
+  return COLLECTION_MAP[storeName] || storeName;
+}
+
+async function firestoreSet(storeName, docId, data) {
+  if (!fdb) return;
   try {
-    await db.collection(collection).doc(docId).set(data, { merge: true });
+    const clean = { ...data };
+    delete clean._new;
+    delete clean._deleted;
+    await fdb.collection(getCollection(storeName)).doc(docId).set(clean, { merge: true });
   } catch (e) {
     console.error('Firestore set failed:', e);
   }
 }
 
-async function firestoreGet(collection, docId) {
-  if (!db) return null;
+async function firestoreGetAll(storeName) {
+  if (!fdb) return [];
   try {
-    const doc = await db.collection(collection).doc(docId).get();
-    return doc.exists ? doc.data() : null;
-  } catch (e) {
-    console.error('Firestore get failed:', e);
-    return null;
-  }
-}
-
-async function firestoreGetAll(collection) {
-  if (!db) return [];
-  try {
-    const snapshot = await db.collection(collection).get();
+    const snapshot = await fdb.collection(getCollection(storeName)).get();
     const results = [];
     snapshot.forEach((doc) => {
       results.push({ id: doc.id, ...doc.data() });
@@ -123,38 +128,46 @@ async function firestoreGetAll(collection) {
   }
 }
 
-async function firestoreDelete(collection, docId) {
-  if (!db) return;
+async function firestoreDelete(storeName, docId) {
+  if (!fdb) return;
   try {
-    await db.collection(collection).doc(docId).delete();
+    await fdb.collection(getCollection(storeName)).doc(docId).delete();
   } catch (e) {
     console.error('Firestore delete failed:', e);
   }
 }
 
-// ---- Storage Helpers ----
+// ---- Compress Image before storing ----
+// Firestore docs have 1MB limit.
+// We compress to ~800px wide JPEG at 0.6 quality
+// which typically gives < 200KB per photo.
 
-async function storageUpload(path, data) {
-  if (!storage) return null;
-  try {
-    const ref = storage.ref().child(path);
-    await ref.putString(data, 'data_url');
-    return await ref.getDownloadURL();
-  } catch (e) {
-    console.error('Storage upload failed:', e);
-    return null;
-  }
-}
-
-async function storageDownload(path) {
-  if (!storage) return null;
-  try {
-    const ref = storage.ref().child(path);
-    return await ref.getDownloadURL();
-  } catch (e) {
-    console.error('Storage download failed:', e);
-    return null;
-  }
+function compressImage(file, maxWidth, quality) {
+  maxWidth = maxWidth || 800;
+  quality = quality || 0.6;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > maxWidth) {
+          h = Math.round((h * maxWidth) / w);
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ---- Load on script load ----
