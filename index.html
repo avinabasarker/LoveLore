@@ -63,10 +63,10 @@
     <!-- PIN Display -->
     <div class="relative z-10 mb-6">
       <div id="pinDisplay" class="flex items-center justify-center gap-3 h-14 px-6 bg-white/60 backdrop-blur-md rounded-2xl border border-blush-200/50 min-w-[180px]">
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">•</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
+        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
       </div>
       <p id="pinError" class="text-blush-400 text-xs mt-2 h-5 font-medium tracking-wide text-center"></p>
     </div>
@@ -600,6 +600,17 @@
   <script src="js/firebase-config.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/app.js"></script>
+
+  <!-- Register Service Worker for PWA -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/relationship-wiki/sw.js')
+          .then(function(reg) { console.log('SW registered:', reg.scope); })
+          .catch(function(e) { console.warn('SW registration failed:', e); });
+      });
+    }
+  </script>
 
 </body>
 </html>
