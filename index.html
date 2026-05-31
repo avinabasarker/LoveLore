@@ -1,688 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>LoveLore</title>
-  <meta name="description" content="Your private relationship wiki" />
-  <meta name="theme-color" content="#FFF0F3" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            blush: { 50:'#FFF5F7', 100:'#FFF0F3', 200:'#FFCCD5', 300:'#FF8FA3', 400:'#FF4D6D', 500:'#E5383B' },
-            sage: { 50:'#F6FAF4', 100:'#F0F4EF', 200:'#D8E8D4', 300:'#A3C48B', 400:'#6B9E4F', 500:'#4A7C2E' },
-            cream: { 25:'#FFFEFB', 50:'#FFFDF7', 100:'#FFF8E7', 200:'#FFEFCC' },
-            charcoal: { 600:'#555555', 700:'#3D3D3D', 800:'#2B2B2B', 900:'#1A1A1A' },
-            warmgray: { 100:'#F5F0EB', 200:'#E8E0D8' }
-          },
-          fontFamily: { Inter: ['Inter','sans-serif'] },
-          boxShadow: {
-            'card': '0 2px 15px -3px rgba(255,77,109,0.08), 0 4px 6px -4px rgba(0,0,0,0.05)',
-            'card-hover': '0 8px 30px -5px rgba(255,77,109,0.15), 0 4px 6px -4px rgba(0,0,0,0.08)',
-            'glow': '0 0 20px rgba(255,77,109,0.3)',
-            'soft': '0 1px 3px rgba(0,0,0,0.04)',
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link rel="stylesheet" href="css/style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LoveLore</title>
+    <meta name="description" content="A private world for us">
+    <meta name="theme-color" content="#FFF5F3">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-cream-50 font-Inter overflow-hidden h-screen select-none">
+<body>
 
-  <!-- ============================================ -->
-  <!-- SCREEN 1: LOCK SCREEN                       -->
-  <!-- ============================================ -->
-  <div id="lockScreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-animated"></div>
-    <div class="floating-hearts absolute inset-0 pointer-events-none overflow-hidden">
-      <i class="fa-solid fa-heart floating-heart" style="left:10%;animation-delay:0s;font-size:12px;opacity:0.15"></i>
-      <i class="fa-solid fa-heart floating-heart" style="left:25%;animation-delay:2s;font-size:8px;opacity:0.1"></i>
-      <i class="fa-solid fa-heart floating-heart" style="left:45%;animation-delay:4s;font-size:16px;opacity:0.12"></i>
-      <i class="fa-solid fa-heart floating-heart" style="left:65%;animation-delay:1s;font-size:10px;opacity:0.1"></i>
-      <i class="fa-solid fa-heart floating-heart" style="left:80%;animation-delay:3s;font-size:14px;opacity:0.13"></i>
-      <i class="fa-solid fa-heart floating-heart" style="left:90%;animation-delay:5s;font-size:9px;opacity:0.08"></i>
-    </div>
-    <div class="relative z-10 text-center mb-6">
-      <div class="heart-pulse inline-block mb-4">
-        <i class="fa-solid fa-heart text-blush-400 text-5xl"></i>
-      </div>
-      <h1 class="text-4xl font-extrabold text-charcoal-800 tracking-tight mb-1">LoveLore</h1>
-      <p class="text-charcoal-600 text-sm font-light tracking-wide">Your story, kept safe</p>
+    <!-- ============ LOGIN SCREEN ============ -->
+    <div id="loginScreen" class="screen">
+        <div class="login-bg-hearts"></div>
+        <div class="login-container">
+            <div class="login-brand">
+                <div class="brand-heart"><i class="fas fa-heart"></i></div>
+                <h1 class="brand-title">LoveLore</h1>
+                <p class="brand-subtitle">Our private world</p>
+            </div>
+
+            <!-- Avatar Selection -->
+            <div id="avatarSection" class="avatar-section">
+                <p class="avatar-label">Who are you?</p>
+                <div class="avatar-options">
+                    <button class="avatar-btn avatar-a" data-user="A">
+                        <span class="avatar-letter">A</span>
+                    </button>
+                    <div class="avatar-heart-connector">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <button class="avatar-btn avatar-p" data-user="P">
+                        <span class="avatar-letter">P</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Password Section (appears after selecting user) -->
+            <div id="passwordSection" class="password-section">
+                <!-- Set Password (first time) -->
+                <div id="setPasswordForm" class="auth-form" style="display:none">
+                    <div class="auth-header">
+                        <div id="setPassAvatar" class="mini-avatar">A</div>
+                        <p class="auth-title">Set your password</p>
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="newPassword" placeholder="Password" class="input-field" autocomplete="new-password">
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="confirmPassword" placeholder="Confirm password" class="input-field" autocomplete="new-password">
+                    </div>
+                    <p id="setPassError" class="auth-error" style="display:none"></p>
+                    <button id="setPasswordBtn" class="btn-primary">
+                        <i class="fas fa-arrow-right"></i> Set Password
+                    </button>
+                </div>
+
+                <!-- Login (returning user) -->
+                <div id="loginForm" class="auth-form" style="display:none">
+                    <div class="auth-header">
+                        <div id="loginAvatar" class="mini-avatar">A</div>
+                        <p class="auth-title">Welcome back, <span id="loginUserName">A</span></p>
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="loginPassword" placeholder="Password" class="input-field" autocomplete="current-password">
+                    </div>
+                    <p id="loginError" class="auth-error" style="display:none"></p>
+                    <button id="loginBtn" class="btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </div>
+
+                <button id="backToAvatar" class="btn-back">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+            </div>
+        </div>
     </div>
 
-    <!-- PIN Display -->
-    <div class="relative z-10 mb-6">
-      <div id="pinDisplay" class="flex items-center justify-center gap-3 h-14 px-6 bg-white/60 backdrop-blur-md rounded-2xl border border-blush-200/50 min-w-[180px]">
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
-        <span class="pin-char text-2xl text-charcoal-800 font-bold">&#8226;</span>
-      </div>
-      <p id="pinError" class="text-blush-400 text-xs mt-2 h-5 font-medium tracking-wide text-center"></p>
-    </div>
+    <!-- ============ MAIN APP ============ -->
+    <div id="mainApp" class="screen" style="display:none">
 
-    <!-- PIN Pad -->
-    <div id="pinPad" class="relative z-10 grid grid-cols-3 gap-3 w-72">
-      <button onclick="pinInput('1')" class="pin-btn"><span>1</span></button>
-      <button onclick="pinInput('2')" class="pin-btn"><span>2</span></button>
-      <button onclick="pinInput('3')" class="pin-btn"><span>3</span></button>
-      <button onclick="pinInput('4')" class="pin-btn"><span>4</span></button>
-      <button onclick="pinInput('5')" class="pin-btn"><span>5</span></button>
-      <button onclick="pinInput('6')" class="pin-btn"><span>6</span></button>
-      <button onclick="pinInput('7')" class="pin-btn"><span>7</span></button>
-      <button onclick="pinInput('8')" class="pin-btn"><span>8</span></button>
-      <button onclick="pinInput('9')" class="pin-btn"><span>9</span></button>
-      <div></div>
-      <button onclick="pinInput('0')" class="pin-btn"><span>0</span></button>
-      <button onclick="pinDelete()" class="pin-btn-delete"><i class="fa-solid fa-delete-left text-lg"></i></button>
-    </div>
-    <button id="pinEnterBtn" onclick="submitPin()" class="relative z-10 mt-5 btn-primary">Enter</button>
-    <button id="setPinBtn" onclick="setFirstPin()" class="relative z-10 hidden mt-3 btn-primary">Set PIN</button>
-  </div>
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <i class="fas fa-heart top-bar-heart"></i>
+                <h1 class="top-bar-title">LoveLore</h1>
+            </div>
+            <div class="top-bar-right">
+                <span id="syncDot" class="sync-dot synced" title="Synced"></span>
+                <button id="logoutBtn" class="top-bar-btn" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
 
-  <!-- ============================================ -->
-  <!-- SCREEN 2: COUPLE CODE (replaces partner)     -->
-  <!-- ============================================ -->
-  <div id="coupleCodeScreen" class="fixed inset-0 z-40 flex-col items-center justify-center overflow-hidden" style="display:none">
-    <div class="absolute inset-0 bg-gradient-to-br from-sage-50 via-cream-50 to-blush-50"></div>
-    <div class="relative z-10 text-center mb-10">
-      <h2 class="text-3xl font-bold text-charcoal-800 mb-2">Welcome to LoveLore</h2>
-      <p class="text-charcoal-600 text-sm font-light">Start your shared story</p>
-    </div>
-    <div class="relative z-10 w-full max-w-sm px-6">
-      <button onclick="createCouple()" class="w-full py-4 rounded-2xl bg-white/80 backdrop-blur-xl border border-blush-200 text-charcoal-800 font-bold text-base mb-4 shadow-card hover:shadow-card-hover transition-all duration-300 active:scale-[0.97]">
-        <i class="fa-solid fa-heart text-blush-400 mr-2"></i>Start Our Story
-      </button>
-      <div class="flex items-center gap-3 my-5">
-        <div class="flex-1 h-px bg-warmgray-200"></div>
-        <span class="text-charcoal-600 text-xs">or join your partner</span>
-        <div class="flex-1 h-px bg-warmgray-200"></div>
-      </div>
-      <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-5 shadow-card border border-blush-200/50">
-        <label class="text-xs text-charcoal-600 font-medium mb-2 block">Enter your partner's couple code</label>
-        <input id="joinCodeInput" type="text" class="input-field text-center tracking-[0.3em] uppercase font-bold text-lg mb-3" placeholder="ABC123" maxlength="6" />
-        <button onclick="joinCouple()" class="btn-primary w-full">Join Couple</button>
-        <p id="joinError" class="text-blush-400 text-xs text-center mt-2 hidden"></p>
-      </div>
-    </div>
-  </div>
+        <!-- Feed Screen -->
+        <div id="feedScreen" class="app-screen active">
+            <!-- Anniversary Banner -->
+            <div id="anniversaryBanner" class="anniversary-banner" style="display:none">
+                <div class="anni-bg-hearts">
+                    <span class="anni-float-heart" style="left:8%;top:15%;animation-delay:0s"><i class="fas fa-heart"></i></span>
+                    <span class="anni-float-heart" style="left:85%;top:25%;animation-delay:1.5s"><i class="fas fa-heart"></i></span>
+                    <span class="anni-float-heart" style="left:45%;top:70%;animation-delay:3s"><i class="fas fa-heart"></i></span>
+                    <span class="anni-float-heart" style="left:20%;top:80%;animation-delay:4.2s"><i class="fas fa-heart"></i></span>
+                    <span class="anni-float-heart" style="left:72%;top:10%;animation-delay:2s"><i class="fas fa-heart"></i></span>
+                </div>
+                <div class="anni-content">
+                    <div class="anni-names">A <i class="fas fa-heart anni-heart-icon"></i> P</div>
+                    <div class="anni-counter">
+                        <span class="anni-number" id="anniDays">0</span>
+                        <span class="anni-label">days together</span>
+                    </div>
+                    <div class="anni-date" id="anniDate">Since forever</div>
+                </div>
+            </div>
 
-  <!-- SHOW CODE SCREEN (after creating couple) -->
-  <div id="showCodeScreen" class="fixed inset-0 z-40 flex-col items-center justify-center overflow-hidden" style="display:none">
-    <div class="absolute inset-0 bg-gradient-to-br from-blush-50 via-cream-50 to-sage-50"></div>
-    <div class="relative z-10 w-full max-w-sm px-6 text-center">
-      <div class="heart-pulse inline-block mb-4">
-        <i class="fa-solid fa-heart text-blush-400 text-4xl"></i>
-      </div>
-      <h2 class="text-2xl font-bold text-charcoal-800 drop-shadow mb-2">Your Couple Code</h2>
-      <p class="text-charcoal-600 text-sm mb-6">Share this with your partner so they can join</p>
-      <div class="bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-card border border-blush-200/50 mb-4">
-        <span id="generatedCode" class="text-4xl font-extrabold tracking-[0.2em] text-blush-400"></span>
-      </div>
-      <button onclick="copyCode()" class="w-full py-3 rounded-xl bg-white/60 backdrop-blur text-charcoal-800 font-medium text-sm mb-3 border border-warmgray-200 active:scale-[0.97] transition-all">
-        <i class="fa-solid fa-copy mr-2"></i>Copy Code
-      </button>
-      <button onclick="enterApp()" class="btn-primary w-full">We're Both In!</button>
-    </div>
-  </div>
+            <div id="postsContainer" class="posts-container">
+                <!-- Posts rendered here by JS -->
+            </div>
+            <div id="emptyFeed" class="empty-state">
+                <div class="empty-icon"><i class="fas fa-heart"></i></div>
+                <p class="empty-title">No posts yet</p>
+                <p class="empty-sub">Tap <i class="fas fa-plus"></i> to share your first moment</p>
+            </div>
+            <div id="feedLoader" class="feed-loader" style="display:none">
+                <div class="spinner"></div>
+            </div>
+        </div>
 
-  <!-- ============================================ -->
-  <!-- MAIN APP SHELL                               -->
-  <!-- ============================================ -->
-  <div id="appShell" class="flex flex-col h-screen" style="display:none">
+        <!-- Profile Screen -->
+        <div id="profileScreen" class="app-screen" style="display:none">
+            <div id="profileContent" class="profile-content">
+                <!-- Rendered by JS -->
+            </div>
+        </div>
 
-    <header class="flex items-center justify-between px-5 py-3 bg-white/70 backdrop-blur-xl border-b border-warmgray-100 z-10">
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-heart text-blush-400 text-sm"></i>
-        <h1 class="text-lg font-bold text-charcoal-800 tracking-tight">LoveLore</h1>
-      </div>
-      <div class="flex items-center gap-3">
-        <span id="syncIndicator" class="sync-dot" title="Synced"></span>
-        <span id="coupleCodeBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blush-100 text-blush-400 cursor-pointer" onclick="showCodeInfo()"></span>
-        <button onclick="lockApp()" class="text-charcoal-600 hover:text-blush-400 transition-colors">
-          <i class="fa-solid fa-lock text-sm"></i>
+        <!-- FAB -->
+        <button id="fabCreate" class="fab" title="New Post">
+            <i class="fas fa-plus"></i>
         </button>
-      </div>
-    </header>
 
-    <main id="mainContent" class="flex-1 overflow-y-auto overflow-x-hidden pb-24 scroll-smooth">
-
-      <!-- HOME SCREEN -->
-      <div id="screenHome" class="screen page-enter p-5">
-        <div class="grid grid-cols-3 gap-3 mb-6">
-          <div class="stat-card stat-blush">
-            <i class="fa-solid fa-heart text-blush-300 text-xs mb-1 block"></i>
-            <p id="statDays" class="stat-number text-blush-400">0</p>
-            <p class="stat-label">Days Together</p>
-          </div>
-          <div class="stat-card stat-sage">
-            <i class="fa-solid fa-bookmark text-sage-300 text-xs mb-1 block"></i>
-            <p id="statMemories" class="stat-number text-sage-400">0</p>
-            <p class="stat-label">Memories</p>
-          </div>
-          <div class="stat-card stat-warm cursor-pointer active:scale-95 transition-transform" onclick="navigate('gallery')">
-            <i class="fa-solid fa-camera text-blush-200 text-xs mb-1 block"></i>
-            <p id="statPhotos" class="stat-number text-charcoal-700">0</p>
-            <p class="stat-label">Photos <i class="fa-solid fa-arrow-right text-[8px]"></i></p>
-          </div>
-        </div>
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-lg font-bold text-charcoal-800">Our Timeline</h2>
-        </div>
-        <div id="timelineFeed" class="space-y-4"></div>
-        <div id="timelineEmpty" class="empty-state">
-          <div class="empty-icon-wrap">
-            <i class="fa-solid fa-book-open"></i>
-          </div>
-          <p class="text-charcoal-800 font-semibold mb-1">Your story starts here</p>
-          <p class="text-charcoal-600 text-sm">Tap the + button to add your first memory</p>
-        </div>
-      </div>
-
-      <!-- GALLERY SCREEN -->
-      <div id="screenGallery" class="screen p-5" style="display:none">
-        <div class="flex items-center justify-between mb-5">
-          <div class="flex items-center gap-3">
-            <button onclick="navigate('home')" class="text-blush-400 hover:text-blush-500 transition-colors">
-              <i class="fa-solid fa-arrow-left text-lg"></i>
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" data-screen="feedScreen">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
             </button>
-            <div>
-              <h2 class="text-2xl font-bold text-charcoal-800">Photo Gallery</h2>
-              <p class="text-charcoal-600 text-sm font-light">All your moments, one place</p>
-            </div>
-          </div>
-          <button onclick="showModal('modalGalleryUpload');hideAddMenu()" class="btn-primary text-sm py-2 px-3">
-            <i class="fa-solid fa-plus mr-1"></i>Upload
-          </button>
-        </div>
-        <div id="galleryGrid" class="grid grid-cols-2 gap-2.5"></div>
-        <div id="galleryEmpty" class="empty-state">
-          <div class="empty-icon-wrap">
-            <i class="fa-solid fa-images"></i>
-          </div>
-          <p class="text-charcoal-800 font-semibold mb-1">No photos yet</p>
-          <p class="text-charcoal-600 text-sm">Upload your first memory photo</p>
-        </div>
-      </div>
-
-      <!-- WIKI SCREEN -->
-      <div id="screenWiki" class="screen p-5" style="display:none">
-        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Wiki</h2>
-        <p class="text-charcoal-600 text-sm font-light mb-5">The encyclopedia of us</p>
-        <div class="tab-bar mb-5">
-          <button onclick="showWikiTab('characters')" class="tab-btn active" data-tab="characters"><i class="fa-solid fa-user-group mr-1.5"></i>Characters</button>
-          <button onclick="showWikiTab('locations')" class="tab-btn" data-tab="locations"><i class="fa-solid fa-map-pin mr-1.5"></i>Places</button>
-          <button onclick="showWikiTab('jokes')" class="tab-btn" data-tab="jokes"><i class="fa-solid fa-face-laugh-beam mr-1.5"></i>Jokes</button>
-        </div>
-        <div id="wikiCharacters" class="wiki-content">
-          <div id="characterList" class="space-y-3"></div>
-          <div id="characterEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-users"></i></div>
-            <p class="text-charcoal-600 text-sm">No characters yet</p>
-          </div>
-        </div>
-        <div id="wikiLocations" class="wiki-content" style="display:none">
-          <div id="locationList" class="grid grid-cols-2 gap-3"></div>
-          <div id="locationEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-map-pin"></i></div>
-            <p class="text-charcoal-600 text-sm">No places yet</p>
-          </div>
-        </div>
-        <div id="wikiJokes" class="wiki-content" style="display:none">
-          <div id="jokeList" class="space-y-3"></div>
-          <div id="jokeEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-face-laugh-beam"></i></div>
-            <p class="text-charcoal-600 text-sm">No inside jokes yet</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- LETTERS SCREEN -->
-      <div id="screenLetters" class="screen p-5" style="display:none">
-        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Our Letters</h2>
-        <p class="text-charcoal-600 text-sm font-light mb-5">Words for the heart</p>
-        <div class="tab-bar mb-5">
-          <button onclick="showLetterTab('openwhen')" class="tab-btn active" data-tab="openwhen"><i class="fa-solid fa-envelope mr-1.5"></i>Open When</button>
-          <button onclick="showLetterTab('capsules')" class="tab-btn" data-tab="capsules"><i class="fa-solid fa-hourglass-half mr-1.5"></i>Capsules</button>
-          <button onclick="showLetterTab('firsts')" class="tab-btn" data-tab="firsts"><i class="fa-solid fa-star mr-1.5"></i>Firsts</button>
-        </div>
-        <div id="letterOpenWhen" class="letter-content">
-          <div id="openWhenList" class="grid grid-cols-2 gap-3"></div>
-          <div id="openWhenEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-envelope"></i></div>
-            <p class="text-charcoal-600 text-sm">No letters yet</p>
-          </div>
-        </div>
-        <div id="letterCapsules" class="letter-content" style="display:none">
-          <div id="capsuleList" class="grid grid-cols-2 gap-3"></div>
-          <div id="capsuleEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-hourglass-half"></i></div>
-            <p class="text-charcoal-600 text-sm">No capsules yet</p>
-          </div>
-        </div>
-        <div id="letterFirsts" class="letter-content" style="display:none">
-          <div id="firstsTimeline" class="firsts-line"></div>
-          <div id="firstsEmpty" class="empty-state compact">
-            <div class="empty-icon-wrap small"><i class="fa-solid fa-star"></i></div>
-            <p class="text-charcoal-600 text-sm">No milestones yet</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- SETTINGS SCREEN -->
-      <div id="screenSettings" class="screen p-5" style="display:none">
-        <h2 class="text-2xl font-bold text-charcoal-800 mb-1">Settings</h2>
-        <p class="text-charcoal-600 text-sm font-light mb-5">Make LoveLore yours</p>
-        <div class="space-y-3">
-          <div class="settings-card">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="settings-icon bg-blush-100"><i class="fa-solid fa-calendar-heart text-blush-400"></i></div>
-              <div>
-                <p class="text-sm font-semibold text-charcoal-800">Anniversary Date</p>
-                <p class="text-xs text-charcoal-600">When did it all begin?</p>
-              </div>
-            </div>
-            <input type="date" id="startDateInput" class="input-field" />
-          </div>
-          <div class="settings-card">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="settings-icon bg-sage-100"><i class="fa-solid fa-link text-sage-400"></i></div>
-              <div>
-                <p class="text-sm font-semibold text-charcoal-800">Couple Code</p>
-                <p class="text-xs text-charcoal-600">Share with your partner to join</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span id="settingsCode" class="text-xl font-extrabold tracking-widest text-blush-400"></span>
-              <button onclick="copyCode()" class="text-xs text-charcoal-600 hover:text-blush-400"><i class="fa-solid fa-copy"></i></button>
-            </div>
-          </div>
-          <div class="settings-card">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="settings-icon bg-sage-100"><i class="fa-solid fa-lock text-sage-400"></i></div>
-              <div>
-                <p class="text-sm font-semibold text-charcoal-800">Change PIN</p>
-                <p class="text-xs text-charcoal-600">Both partners use the same PIN</p>
-              </div>
-            </div>
-            <input type="password" id="newPinInput" maxlength="4" placeholder="New 4-digit PIN" class="input-field" />
-            <button onclick="changePin()" class="btn-secondary mt-2">Update PIN</button>
-          </div>
-          <div class="settings-card">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="settings-icon bg-sage-100"><i class="fa-solid fa-handshake text-sage-400"></i></div>
-              <div>
-                <p class="text-sm font-semibold text-charcoal-800">Fight Log</p>
-                <p class="text-xs text-charcoal-600">Resolution, not blame</p>
-              </div>
-            </div>
-            <div id="fightLogList" class="space-y-3 mb-3"></div>
-            <button onclick="showModal('modalFightLog')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Entry</button>
-          </div>
-          <div class="settings-card">
-            <div class="flex items-center gap-3 mb-3">
-              <div class="settings-icon bg-blush-100"><i class="fa-solid fa-list-check text-blush-400"></i></div>
-              <div>
-                <p class="text-sm font-semibold text-charcoal-800">Our Bucket List</p>
-                <p class="text-xs text-charcoal-600">Dreams to chase together</p>
-              </div>
-            </div>
-            <div id="bucketListActive" class="space-y-2 mb-2"></div>
-            <div id="bucketListCompleted" class="space-y-2 mb-3"></div>
-            <button onclick="showModal('modalBucketList')" class="btn-secondary"><i class="fa-solid fa-plus mr-1"></i> Add Item</button>
-          </div>
-          <div class="settings-card">
-            <button onclick="lockApp()" class="w-full flex items-center justify-center gap-2 bg-charcoal-800 text-white font-semibold py-3 px-4 rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.97] active:bg-charcoal-900">
-              <i class="fa-solid fa-lock"></i> Lock App
+            <button class="nav-btn" data-screen="profileScreen">
+                <i class="fas fa-user"></i>
+                <span>Me</span>
             </button>
-          </div>
+        </nav>
+    </div>
+
+    <!-- ============ CREATE POST MODAL ============ -->
+    <div id="createPostModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet create-post-modal">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2>New Post</h2>
+                <button class="modal-close" id="closeCreatePost"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="create-post-body">
+                <div class="create-post-user">
+                    <div id="createPostAvatar" class="mini-avatar">A</div>
+                    <span id="createPostUser">A</span>
+                </div>
+                <textarea id="postText" placeholder="What's on your mind..." class="post-textarea" rows="4"></textarea>
+                <div id="imagePreview" class="image-preview" style="display:none">
+                    <img id="previewImg" src="" alt="Preview">
+                    <button class="remove-image" id="removeImage"><i class="fas fa-times-circle"></i></button>
+                </div>
+                <div class="post-attach-bar">
+                    <label class="attach-btn" for="imageInput">
+                        <i class="fas fa-image"></i>
+                        <span>Photo</span>
+                    </label>
+                    <input type="file" id="imageInput" accept="image/*" style="display:none">
+                </div>
+            </div>
+            <button id="postBtn" class="btn-primary btn-post" disabled>
+                <i class="fas fa-paper-plane"></i> Post
+            </button>
         </div>
-      </div>
-
-    </main>
-
-    <button id="fabAdd" onclick="showAddMenu()" class="fab-btn">
-      <i class="fa-solid fa-plus"></i>
-    </button>
-
-    <nav class="bottom-nav">
-      <div class="nav-indicator" id="navIndicator"></div>
-      <button onclick="navigate('home')" class="nav-btn active" data-screen="home">
-        <i class="fa-solid fa-timeline"></i>
-        <span>Home</span>
-      </button>
-      <button onclick="navigate('wiki')" class="nav-btn" data-screen="wiki">
-        <i class="fa-solid fa-book"></i>
-        <span>Wiki</span>
-      </button>
-      <button onclick="navigate('letters')" class="nav-btn" data-screen="letters">
-        <i class="fa-solid fa-envelope"></i>
-        <span>Letters</span>
-      </button>
-      <button onclick="navigate('settings')" class="nav-btn" data-screen="settings">
-        <i class="fa-solid fa-gear"></i>
-        <span>Settings</span>
-      </button>
-    </nav>
-
-  </div>
-
-  <!-- ============================================ -->
-  <!-- ADD MENU                                     -->
-  <!-- ============================================ -->
-  <div id="addMenu" class="fixed inset-0 z-40" style="display:none">
-    <div class="absolute inset-0 bg-charcoal-900/50 backdrop-blur-sm" onclick="hideAddMenu()"></div>
-    <div class="add-menu-panel absolute bottom-0 left-0 right-0 bg-white rounded-t-[2rem] p-6 z-50 transform translate-y-full transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]" id="addMenuPanel">
-      <div class="w-10 h-1 bg-warmgray-200 rounded-full mx-auto mb-5"></div>
-      <h3 class="text-lg font-bold text-charcoal-800 mb-4">Add Something New</h3>
-      <div class="grid grid-cols-3 gap-3">
-        <button onclick="showModal('modalTimeline');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
-          <i class="fa-solid fa-clock-rotate-left text-xl mb-1"></i>
-          <span>Memory</span>
-        </button>
-        <button onclick="showModal('modalCharacter');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
-          <i class="fa-solid fa-user text-xl mb-1"></i>
-          <span>Character</span>
-        </button>
-        <button onclick="showModal('modalLocation');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
-          <i class="fa-solid fa-map-pin text-xl mb-1"></i>
-          <span>Place</span>
-        </button>
-        <button onclick="showModal('modalJoke');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
-          <i class="fa-solid fa-face-laugh-beam text-xl mb-1"></i>
-          <span>Joke</span>
-        </button>
-        <button onclick="showModal('modalOpenWhen');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
-          <i class="fa-solid fa-envelope text-xl mb-1"></i>
-          <span>Letter</span>
-        </button>
-        <button onclick="showModal('modalCapsule');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
-          <i class="fa-solid fa-hourglass-half text-xl mb-1"></i>
-          <span>Capsule</span>
-        </button>
-        <button onclick="showModal('modalFirst');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
-          <i class="fa-solid fa-star text-xl mb-1"></i>
-          <span>First</span>
-        </button>
-        <button onclick="showModal('modalFightLog');hideAddMenu()" class="add-menu-item bg-sage-50 text-sage-400 hover:bg-sage-100">
-          <i class="fa-solid fa-handshake text-xl mb-1"></i>
-          <span>Fight Log</span>
-        </button>
-        <button onclick="showModal('modalBucketList');hideAddMenu()" class="add-menu-item bg-blush-50 text-blush-400 hover:bg-blush-100">
-          <i class="fa-solid fa-list-check text-xl mb-1"></i>
-          <span>Bucket</span>
-        </button>
-      </div>
     </div>
-  </div>
 
-  <!-- ============================================ -->
-  <!-- MODALS                                       -->
-  <!-- ============================================ -->
-
-  <div id="modalTimeline" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalTimeline')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Memory</h3>
-        <button onclick="hideModal('modalTimeline')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="date" id="memoryDate" class="input-field" />
-        <input type="text" id="memoryTitle" placeholder="Give this memory a title" class="input-field" />
-        <textarea id="memoryDesc" rows="3" placeholder="What happened..." class="input-field resize-none"></textarea>
-        <label class="file-upload">
-          <input type="file" id="memoryPhoto" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Add Photo
-        </label>
-        <label class="file-upload sage">
-          <input type="file" id="memoryAudio" accept="audio/*" />
-          <i class="fa-solid fa-microphone"></i> Add Audio
-        </label>
-        <button onclick="saveMemory()" class="btn-primary w-full">Save Memory</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalGalleryUpload" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalGalleryUpload')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>Upload Photo</h3>
-        <button onclick="hideModal('modalGalleryUpload')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <label class="file-upload">
-          <input type="file" id="galleryPhotoFile" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Select Photo
-        </label>
-        <input type="date" id="galleryPhotoDate" class="input-field" />
-        <button onclick="saveGalleryPhoto()" class="btn-primary w-full">Upload Photo</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalCharacter" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalCharacter')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Character</h3>
-        <button onclick="hideModal('modalCharacter')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="charName" placeholder="Their name" class="input-field" />
-        <input type="text" id="charRole" placeholder="Role (e.g. My Partner, My Sister)" class="input-field" />
-        <textarea id="charBio" rows="3" placeholder="Tell us about them..." class="input-field resize-none"></textarea>
-        <label class="file-upload">
-          <input type="file" id="charPhoto" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Add Photo
-        </label>
-        <input type="text" id="charTags" placeholder="Tags (comma separated)" class="input-field" />
-        <button onclick="saveCharacter()" class="btn-secondary w-full">Save Character</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalLocation" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalLocation')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Place</h3>
-        <button onclick="hideModal('modalLocation')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="locName" placeholder="Location name" class="input-field" />
-        <textarea id="locHistory" rows="3" placeholder="Our history here..." class="input-field resize-none"></textarea>
-        <label class="file-upload">
-          <input type="file" id="locPhoto" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Add Cover Photo
-        </label>
-        <button onclick="saveLocation()" class="btn-secondary w-full">Save Place</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalJoke" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalJoke')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Inside Joke</h3>
-        <button onclick="hideModal('modalJoke')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="jokeTerm" placeholder="The term or phrase" class="input-field" />
-        <input type="text" id="jokeDef" placeholder="Definition" class="input-field" />
-        <textarea id="jokeOrigin" rows="3" placeholder="Origin story..." class="input-field resize-none"></textarea>
-        <button onclick="saveJoke()" class="btn-secondary w-full">Save Joke</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalOpenWhen" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalOpenWhen')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Letter</h3>
-        <button onclick="hideModal('modalOpenWhen')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="letterTitle" placeholder='Title (e.g. "Open when you miss me")' class="input-field" />
-        <textarea id="letterBody" rows="5" placeholder="Write your heart out..." class="input-field resize-none"></textarea>
-        <label class="file-upload">
-          <input type="file" id="letterPhoto" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Attach Photo
-        </label>
-        <button onclick="saveOpenWhen()" class="btn-primary w-full">Seal Letter</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalCapsule" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalCapsule')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Time Capsule</h3>
-        <button onclick="hideModal('modalCapsule')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="capsuleTitle" placeholder="Capsule title" class="input-field" />
-        <textarea id="capsuleBody" rows="5" placeholder="A message for the future..." class="input-field resize-none"></textarea>
-        <label class="text-xs font-semibold text-charcoal-700 block">Unlocks On</label>
-        <input type="datetime-local" id="capsuleDate" class="input-field" />
-        <label class="file-upload">
-          <input type="file" id="capsulePhoto" accept="image/*" />
-          <i class="fa-solid fa-camera"></i> Attach Photo
-        </label>
-        <button onclick="saveCapsule()" class="btn-primary w-full">Bury Capsule</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalFirst" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalFirst')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Milestone</h3>
-        <button onclick="hideModal('modalFirst')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="date" id="firstDate" class="input-field" />
-        <input type="text" id="firstTitle" placeholder='Title (e.g. "First Date")' class="input-field" />
-        <textarea id="firstDesc" rows="2" placeholder="The story behind it..." class="input-field resize-none"></textarea>
-        <button onclick="saveFirst()" class="btn-primary w-full">Save Milestone</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalFightLog" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalFightLog')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>Resolution Entry</h3>
-        <button onclick="hideModal('modalFightLog')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <textarea id="fightWhat" rows="2" placeholder="What happened..." class="input-field sage resize-none"></textarea>
-        <textarea id="fightResolved" rows="2" placeholder="How we resolved it..." class="input-field sage resize-none"></textarea>
-        <textarea id="fightLesson" rows="2" placeholder="Lesson learned..." class="input-field sage resize-none"></textarea>
-        <button onclick="saveFightLog()" class="btn-secondary w-full">Save Entry</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalBucketList" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalBucketList')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>New Bucket List Item</h3>
-        <button onclick="hideModal('modalBucketList')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body space-y-3">
-        <input type="text" id="bucketTitle" placeholder="What do we want to do?" class="input-field" />
-        <textarea id="bucketDetails" rows="2" placeholder="Details..." class="input-field resize-none"></textarea>
-        <button onclick="saveBucketItem()" class="btn-primary w-full">Add to List</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="modalPhotoGrid" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalPhotoGrid')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3>Photo Gallery</h3>
-        <button onclick="hideModal('modalPhotoGrid')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div id="photoGridContent" class="grid grid-cols-3 gap-1.5"></div>
-        <div id="photoGridEmpty" class="empty-state compact">
-          <div class="empty-icon-wrap small"><i class="fa-solid fa-image"></i></div>
-          <p class="text-charcoal-600 text-sm">No photos yet</p>
+    <!-- ============ COMMENTS MODAL ============ -->
+    <div id="commentsModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet comments-modal">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2>Comments</h2>
+                <button class="modal-close" id="closeComments"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="commentsList" class="comments-list">
+                <div class="comments-empty">
+                    <p>No comments yet. Say something sweet!</p>
+                </div>
+            </div>
+            <div class="comment-input-bar">
+                <div id="commentAvatar" class="mini-avatar tiny">A</div>
+                <input type="text" id="commentInput" placeholder="Add a comment..." class="comment-input" maxlength="500">
+                <button id="sendComment" class="comment-send" disabled><i class="fas fa-paper-plane"></i></button>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
 
-  <div id="modalCharDetail" class="modal" style="display:none">
-    <div class="modal-overlay" onclick="hideModal('modalCharDetail')"></div>
-    <div class="modal-sheet">
-      <div class="modal-handle"></div>
-      <div class="modal-header">
-        <h3 id="charDetailName">Character</h3>
-        <button onclick="hideModal('modalCharDetail')" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div class="modal-body">
-        <div class="text-center mb-4">
-          <img id="charDetailImg" src="" alt="" class="w-24 h-24 rounded-full object-cover mx-auto mb-3 shadow-card ring-4 ring-blush-100" />
-          <p id="charDetailRole" class="text-sm font-medium text-blush-400"></p>
-        </div>
-        <p id="charDetailBio" class="text-sm text-charcoal-700 leading-relaxed mb-4"></p>
-        <h4 class="text-xs font-bold text-charcoal-800 uppercase tracking-wider mb-2">Related Memories</h4>
-        <div id="charDetailEvents" class="space-y-2"></div>
-      </div>
+    <!-- ============ IMAGE VIEWER ============ -->
+    <div id="imageViewer" class="image-viewer" style="display:none">
+        <button class="viewer-close" id="closeViewer"><i class="fas fa-times"></i></button>
+        <img id="viewerImg" src="" alt="">
     </div>
-  </div>
 
-  <!-- ============================================ -->
-  <!-- SCRIPTS                                      -->
-  <!-- ============================================ -->
-  <script src="js/utils.js"></script>
-  <script src="js/crypto.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/firebase-config.js"></script>
-  <script src="js/sync.js"></script>
-  <script src="js/app.js"></script>
+    <!-- ============ TOAST ============ -->
+    <div id="toast" class="toast" style="display:none"></div>
 
-  <!-- Register Service Worker for PWA -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/relationship-wiki/sw.js')
-          .then(function(reg) { console.log('SW registered:', reg.scope); })
-          .catch(function(e) { console.warn('SW registration failed:', e); });
-      });
-    }
-  </script>
+    <!-- ============ DOUBLE-TAP HEART ============ -->
+    <div id="doubleTapHeart" class="double-tap-heart" style="display:none">
+        <i class="fas fa-heart"></i>
+    </div>
 
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+    <!-- App -->
+    <script src="app.js"></script>
 </body>
 </html>
