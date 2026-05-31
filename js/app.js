@@ -1,1039 +1,1005 @@
-/* ============================================ */
-/* LoveLore — Main Application Logic            */
-/* ============================================ */
-
-let currentPin = '';
-let currentScreen = 'home';
-let countdownTimer = null;
-
-// ---- PIN Logic ----
-
-function pinInput(digit) {
-  if (currentPin.length >= 4) return;
-  currentPin += digit;
-  updatePinDisplay();
-  if (currentPin.length === 4) {
-    if (!hasPin()) {
-      document.getElementById('setPinBtn').classList.remove('hidden');
-      document.getElementById('pinEnterBtn').classList.add('hidden');
-    }
-  }
-}
-
-function pinDelete() {
-  currentPin = currentPin.slice(0, -1);
-  updatePinDisplay();
-  document.getElementById('pinError').textContent = '';
-  document.getElementById('setPinBtn').classList.add('hidden');
-  if (hasPin()) document.getElementById('pinEnterBtn').classList.remove('hidden');
-}
-
-function updatePinDisplay() {
-  const chars = document.querySelectorAll('.pin-char');
-  chars.forEach(function(el, i) {
-    if (i < currentPin.length) {
-      el.textContent = '\u2022';
-      el.classList.add('filled');
-    } else {
-      el.textContent = '\u2022';
-      el.classList.remove('filled');
-    }
-  });
-}
-
-function submitPin() {
-  if (currentPin.length !== 4) return;
-  var stored = getStoredPin();
-  if (currentPin === stored) {
-    unlockSuccess();
-  } else {
-    var display = document.getElementById('pinDisplay');
-    display.classList.add('shake');
-    document.getElementById('pinError').textContent = 'Wrong PIN. Try again.';
-    currentPin = '';
-    updatePinDisplay();
-    setTimeout(function() { display.classList.remove('shake'); }, 500);
-  }
-}
-
-function setFirstPin() {
-  if (currentPin.length !== 4) return;
-  setStoredPin(currentPin);
-  unlockSuccess();
-}
-
-function changePin() {
-  var newPin = document.getElementById('newPinInput').value;
-  if (newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
-    alert('PIN must be exactly 4 digits');
-    return;
-  }
-  setStoredPin(newPin);
-  document.getElementById('newPinInput').value = '';
-  alert('PIN updated! Make sure your partner knows the new PIN.');
-}
-
-function unlockSuccess() {
-  var lock = document.getElementById('lockScreen');
-  lock.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-  lock.style.opacity = '0';
-  lock.style.transform = 'scale(1.05)';
-  setTimeout(function() {
-    lock.style.display = 'none';
-    if (hasCoupleCode()) {
-      showAppShell();
-    } else {
-      document.getElementById('coupleCodeScreen').style.display = 'flex';
-    }
-  }, 500);
-}
-
-// ---- Couple Code Logic ----
-
-async function createCouple() {
-  var code = generateCoupleCode();
-  setCoupleCode(code);
-
-  // Generate salt and save to Firestore so partner can get it
-  getOrCreateSalt(); // This generates and stores locally if needed
-  var saltBase64 = getSaltBase64();
-
-  var saved = await saveCoupleConfig(code, saltBase64);
-  if (!saved) {
-    alert('Failed to create couple. Check your internet connection.');
-    localStorage.removeItem('lovelore_couple_code');
-    return;
-  }
-
-  // Show the code
-  document.getElementById('coupleCodeScreen').style.display = 'none';
-  document.getElementById('generatedCode').textContent = code;
-  document.getElementById('showCodeScreen').style.display = 'flex';
-}
-
-async function joinCouple() {
-  var input = document.getElementById('joinCodeInput').value.trim().toUpperCase();
-  var errorEl = document.getElementById('joinError');
-
-  if (input.length !== 6) {
-    errorEl.textContent = 'Code must be 6 characters';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  errorEl.classList.add('hidden');
-
-  // Fetch couple config from Firestore
-  var config = await loadCoupleConfig(input);
-  if (!config) {
-    errorEl.textContent = 'Code not found. Check with your partner.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  // Store couple code and salt locally
-  setCoupleCode(input);
-  setExternalSalt(config.salt);
-
-  // Hide code screen and enter app
-  document.getElementById('coupleCodeScreen').style.display = 'none';
-
-  // Do an initial sync to pull all existing data
-  await initialSync();
-  showAppShell();
-}
-
-function enterApp() {
-  document.getElementById('showCodeScreen').style.display = 'none';
-  showAppShell();
-}
-
-function copyCode() {
-  var code = getCoupleCode();
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(code).then(function() {
-      alert('Code copied!');
-    }).catch(function() {
-      prompt('Copy this code:', code);
-    });
-  } else {
-    prompt('Copy this code:', code);
-  }
-}
-
-function showCodeInfo() {
-  var code = getCoupleCode();
-  alert('Your couple code: ' + code + '\n\nShare this with your partner so they can join.\nBoth of you use the same PIN.');
-}
-
-// ---- Show App Shell ----
-
-function showAppShell() {
-  var shell = document.getElementById('appShell');
-  shell.style.display = 'flex';
-  shell.style.opacity = '0';
-  shell.style.transition = 'opacity 0.4s ease';
-  setTimeout(function() { shell.style.opacity = '1'; }, 50);
-
-  // Show couple code in header and settings
-  var code = getCoupleCode();
-  document.getElementById('coupleCodeBadge').textContent = code;
-  document.getElementById('settingsCode').textContent = code;
-
-  initApp();
-}
-
-function lockApp() {
-  currentPin = '';
-  updatePinDisplay();
-  document.getElementById('pinError').textContent = '';
-  document.getElementById('lockScreen').style.display = 'flex';
-  document.getElementById('lockScreen').style.opacity = '1';
-  document.getElementById('lockScreen').style.transform = 'scale(1)';
-  document.getElementById('appShell').style.display = 'none';
-  document.getElementById('pinEnterBtn').classList.remove('hidden');
-  document.getElementById('setPinBtn').classList.add('hidden');
-  if (countdownTimer) clearInterval(countdownTimer);
-}
-
-// ---- Navigation ----
-
-function navigate(screen) {
-  currentScreen = screen;
-  document.querySelectorAll('.screen').forEach(function(el) { el.style.display = 'none'; });
-  var target = document.getElementById('screen' + screen.charAt(0).toUpperCase() + screen.slice(1));
-  if (target) {
-    target.style.display = 'block';
-    target.classList.remove('page-enter');
-    void target.offsetWidth;
-    target.classList.add('page-enter');
-  }
-  document.querySelectorAll('.nav-btn').forEach(function(btn) {
-    btn.classList.toggle('active', btn.dataset.screen === screen);
-  });
-
-  // Hide FAB on gallery screen
-  var fab = document.getElementById('fabAdd');
-  fab.style.display = (screen === 'gallery') ? 'none' : 'flex';
-
-  refreshCurrentScreen();
-  document.getElementById('mainContent').scrollTop = 0;
-}
-
-function refreshCurrentScreen() {
-  switch (currentScreen) {
-    case 'home': renderTimeline(); updateNerdStats(); break;
-    case 'gallery': renderGallery(); break;
-    case 'wiki': renderCharacters(); renderLocations(); renderJokes(); break;
-    case 'letters': renderOpenWhen(); renderCapsules(); renderFirsts(); startCountdowns(); break;
-    case 'settings': renderFightLog(); renderBucketList(); break;
-  }
-}
-
-// ---- Wiki Tabs ----
-
-function showWikiTab(tab) {
-  document.querySelectorAll('.wiki-content').forEach(function(el) { el.style.display = 'none'; });
-  document.querySelectorAll('.tab-bar .tab-btn').forEach(function(btn) {
-    if (btn.dataset && btn.dataset.tab) btn.classList.toggle('active', btn.dataset.tab === tab);
-  });
-  var target = document.getElementById('wiki' + tab.charAt(0).toUpperCase() + tab.slice(1));
-  if (target) target.style.display = 'block';
-}
-
-// ---- Letter Tabs ----
-
-function showLetterTab(tab) {
-  document.querySelectorAll('.letter-content').forEach(function(el) { el.style.display = 'none'; });
-  document.querySelectorAll('.tab-bar .tab-btn').forEach(function(btn) {
-    if (btn.dataset && btn.dataset.tab) btn.classList.toggle('active', btn.dataset.tab === tab);
-  });
-  if (tab === 'openwhen') document.getElementById('letterOpenWhen').style.display = 'block';
-  else if (tab === 'capsules') document.getElementById('letterCapsules').style.display = 'block';
-  else if (tab === 'firsts') document.getElementById('letterFirsts').style.display = 'block';
-  if (tab === 'capsules') startCountdowns();
-}
-
-// ---- Add Menu ----
-
-function showAddMenu() {
-  var menu = document.getElementById('addMenu');
-  menu.style.display = 'block';
-  setTimeout(function() { document.getElementById('addMenuPanel').style.transform = 'translateY(0)'; }, 10);
-}
-
-function hideAddMenu() {
-  document.getElementById('addMenuPanel').style.transform = 'translateY(100%)';
-  setTimeout(function() { document.getElementById('addMenu').style.display = 'none'; }, 500);
-}
-
-// ---- Modals ----
-
-function showModal(id) { document.getElementById(id).style.display = 'flex'; }
-function hideModal(id) { document.getElementById(id).style.display = 'none'; }
-
-// ============================================
-// DELETE FUNCTIONS
-// ============================================
-
-async function deleteItem(storeName, id, label) {
-  if (!confirm('Delete this ' + label + '? This cannot be undone.')) return;
-  await dbDelete(storeName, id);
-  await addToSyncQueue('delete', storeName, { id: id });
-  refreshCurrentScreen();
-  updateNerdStats();
-}
-
-// ============================================
-// SAVE FUNCTIONS
-// ============================================
-
-async function saveMemory() {
-  var dateVal = document.getElementById('memoryDate').value || todayStr();
-  var title = document.getElementById('memoryTitle').value.trim();
-  var desc = document.getElementById('memoryDesc').value.trim();
-  var photoFile = document.getElementById('memoryPhoto').files[0];
-  var audioFile = document.getElementById('memoryAudio').files[0];
-  if (!title) { alert('Please add a title'); return; }
-
-  var photoData = '';
-  if (photoFile) photoData = await compressImage(photoFile);
-  var audioData = '';
-  if (audioFile) audioData = await fileToBase64(audioFile);
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'memory', date: dateVal,
-    title: title, description: desc,
-    photo: photoData, audio: audioData,
-    audioName: audioFile ? audioFile.name : '',
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('memories', item);
-  hideModal('modalTimeline');
-  clearModal('modalTimeline');
-  renderTimeline();
-  updateNerdStats();
-}
-
-async function saveGalleryPhoto() {
-  var photoFile = document.getElementById('galleryPhotoFile').files[0];
-  var dateVal = document.getElementById('galleryPhotoDate').value || todayStr();
-  if (!photoFile) { alert('Please select a photo'); return; }
-
-  var photoData = await compressImage(photoFile);
-  var id = generateId();
-  var item = {
-    id: id, type: 'gallery_photo', date: dateVal,
-    title: '', description: '',
-    photo: photoData,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('memories', item);
-  hideModal('modalGalleryUpload');
-  clearModal('modalGalleryUpload');
-  renderGallery();
-  updateNerdStats();
-}
-
-async function saveCharacter() {
-  var name = document.getElementById('charName').value.trim();
-  var role = document.getElementById('charRole').value.trim();
-  var bio = document.getElementById('charBio').value.trim();
-  var photoFile = document.getElementById('charPhoto').files[0];
-  var tags = document.getElementById('charTags').value.trim();
-  if (!name) { alert('Please add a name'); return; }
-
-  var photoData = '';
-  if (photoFile) photoData = await compressImage(photoFile);
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'character', name: name, role: role, bio: bio,
-    photo: photoData, tags: tags,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('characters', item);
-  hideModal('modalCharacter');
-  clearModal('modalCharacter');
-  renderCharacters();
-}
-
-async function saveLocation() {
-  var name = document.getElementById('locName').value.trim();
-  var history = document.getElementById('locHistory').value.trim();
-  var photoFile = document.getElementById('locPhoto').files[0];
-  if (!name) { alert('Please add a location name'); return; }
-
-  var photoData = '';
-  if (photoFile) photoData = await compressImage(photoFile);
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'location', name: name, history: history,
-    coverPhoto: photoData,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('locations', item);
-  hideModal('modalLocation');
-  clearModal('modalLocation');
-  renderLocations();
-}
-
-async function saveJoke() {
-  var term = document.getElementById('jokeTerm').value.trim();
-  var definition = document.getElementById('jokeDef').value.trim();
-  var originStory = document.getElementById('jokeOrigin').value.trim();
-  if (!term) { alert('Please add the term'); return; }
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'joke', term: term, definition: definition, originStory: originStory,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('jokes', item);
-  hideModal('modalJoke');
-  clearModal('modalJoke');
-  renderJokes();
-}
-
-async function saveOpenWhen() {
-  var title = document.getElementById('letterTitle').value.trim();
-  var body = document.getElementById('letterBody').value.trim();
-  var photoFile = document.getElementById('letterPhoto').files[0];
-  if (!title || !body) { alert('Please add title and letter body'); return; }
-
-  var photoData = '';
-  if (photoFile) photoData = await compressImage(photoFile);
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'openwhen', title: title, body: body,
-    photo: photoData, opened: false,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('letters', item);
-  hideModal('modalOpenWhen');
-  clearModal('modalOpenWhen');
-  renderOpenWhen();
-}
-
-async function saveCapsule() {
-  var title = document.getElementById('capsuleTitle').value.trim();
-  var body = document.getElementById('capsuleBody').value.trim();
-  var unlockDate = document.getElementById('capsuleDate').value;
-  var photoFile = document.getElementById('capsulePhoto').files[0];
-  if (!title || !body || !unlockDate) { alert('Please fill all fields'); return; }
-
-  var photoData = '';
-  if (photoFile) photoData = await compressImage(photoFile);
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'capsule', title: title, body: body,
-    photo: photoData, unlockDate: unlockDate, opened: false,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('capsules', item);
-  hideModal('modalCapsule');
-  clearModal('modalCapsule');
-  renderCapsules();
-}
-
-async function saveFirst() {
-  var date = document.getElementById('firstDate').value || todayStr();
-  var title = document.getElementById('firstTitle').value.trim();
-  var desc = document.getElementById('firstDesc').value.trim();
-  if (!title) { alert('Please add a title'); return; }
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'first', date: date, title: title, description: desc,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('firsts', item);
-  hideModal('modalFirst');
-  clearModal('modalFirst');
-  renderFirsts();
-}
-
-async function saveFightLog() {
-  var whatHappened = document.getElementById('fightWhat').value.trim();
-  var howResolved = document.getElementById('fightResolved').value.trim();
-  var lessonLearned = document.getElementById('fightLesson').value.trim();
-  if (!whatHappened) { alert('Please describe what happened'); return; }
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'fightlog', whatHappened: whatHappened,
-    howResolved: howResolved, lessonLearned: lessonLearned,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('fightlog', item);
-  hideModal('modalFightLog');
-  clearModal('modalFightLog');
-  renderFightLog();
-}
-
-async function saveBucketItem() {
-  var title = document.getElementById('bucketTitle').value.trim();
-  var details = document.getElementById('bucketDetails').value.trim();
-  if (!title) { alert('Please add an item'); return; }
-
-  var id = generateId();
-  var item = {
-    id: id, type: 'bucket', title: title, details: details,
-    completed: false,
-    createdAt: Date.now(), updatedAt: Date.now(), _new: true
-  };
-  await saveAndQueue('bucketlist', item);
-  hideModal('modalBucketList');
-  clearModal('modalBucketList');
-  renderBucketList();
-}
-
-function clearModal(modalId) {
-  var modal = document.getElementById(modalId);
-  if (!modal) return;
-  modal.querySelectorAll('input[type="text"],input[type="password"],input[type="date"],input[type="datetime-local"],textarea').forEach(function(el) { el.value = ''; });
-  modal.querySelectorAll('input[type="file"]').forEach(function(el) { el.value = ''; });
-}
-
-// ============================================
-// RENDER FUNCTIONS
-// ============================================
-
-async function renderTimeline() {
-  var allItems = await dbGetAllSorted('memories', 'date', true);
-  // Filter out gallery-only photos (they belong in gallery, not timeline)
-  var items = allItems.filter(function(item) { return item.type !== 'gallery_photo'; });
-  var feed = document.getElementById('timelineFeed');
-  var empty = document.getElementById('timelineEmpty');
-
-  if (items.length === 0) { feed.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  feed.innerHTML = items.map(function(item) {
-    var photoHtml = '';
-    if (item.photo) {
-      photoHtml = '<img src="' + escapeHtml(item.photo) + '" alt="" onclick="viewFullImage(\'' + item.id + '\')" style="cursor:pointer" />';
-    }
-    var audioHtml = '';
-    if (item.audio) {
-      var audioId = 'audio_' + item.id;
-      audioHtml = '<div class="audio-player">' +
-        '<button onclick="toggleAudio(\'' + audioId + '\', this)"><i class="fa-solid fa-play"></i></button>' +
-        '<span>' + escapeHtml(item.audioName || 'Voice memo') + '</span>' +
-        '<audio id="' + audioId + '" src="' + escapeHtml(item.audio) + '" preload="none"></audio>' +
-        '</div>';
-    }
-    return '<div class="timeline-card">' +
-      '<div class="timeline-card-header">' +
-        '<p class="text-xs text-blush-400 font-medium">' + escapeHtml(formatDateShort(item.date)) + '</p>' +
-        '<button class="btn-danger" onclick="deleteItem(\'memories\',\'' + item.id + '\',\'memory\')"><i class="fa-solid fa-trash-can mr-0.5"></i> Delete</button>' +
-      '</div>' +
-      '<h3 class="text-base font-bold text-charcoal-800 mb-1">' + escapeHtml(item.title) + '</h3>' +
-      (item.description ? '<p class="text-sm text-charcoal-600 leading-relaxed">' + escapeHtml(item.description) + '</p>' : '') +
-      photoHtml + audioHtml +
-      '</div>';
-  }).join('');
-}
-
-// ---- Gallery Screen ----
-
-async function renderGallery() {
-  var memories = await dbGetAll('memories');
-  var letters = await dbGetAll('letters');
-  var capsules = await dbGetAll('capsules');
-  var locations = await dbGetAll('locations');
-  var characters = await dbGetAll('characters');
-
-  var allPhotos = [];
-
-  memories.forEach(function(m) {
-    if (m.photo) allPhotos.push({ src: m.photo, date: m.date || '', title: m.title || '', storeName: 'memories', id: m.id });
-  });
-  letters.forEach(function(l) {
-    if (l.photo) allPhotos.push({ src: l.photo, date: formatDateShort(new Date(l.createdAt).toISOString()), title: l.title || '', storeName: 'letters', id: l.id });
-  });
-  capsules.forEach(function(c) {
-    if (c.photo) allPhotos.push({ src: c.photo, date: formatDateShort(new Date(c.createdAt).toISOString()), title: c.title || '', storeName: 'capsules', id: c.id });
-  });
-  locations.forEach(function(l) {
-    if (l.coverPhoto) allPhotos.push({ src: l.coverPhoto, date: '', title: l.name || '', storeName: 'locations', id: l.id });
-  });
-  characters.forEach(function(c) {
-    if (c.photo) allPhotos.push({ src: c.photo, date: '', title: c.name || '', storeName: 'characters', id: c.id });
-  });
-
-  var grid = document.getElementById('galleryGrid');
-  var empty = document.getElementById('galleryEmpty');
-
-  // Sort photos by date (newest first)
-  allPhotos.sort(function(a, b) {
-    if (!a.date) return 1;
-    if (!b.date) return -1;
-    return new Date(b.date) - new Date(a.date);
-  });
-
-  if (allPhotos.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  grid.innerHTML = allPhotos.map(function(p, idx) {
-    return '<div class="photo-grid-item" style="aspect-ratio:1">' +
-      '<img src="' + escapeHtml(p.src) + '" alt="" onclick="viewFullImageBySrc(\'' + idx + '\')" style="cursor:pointer" />' +
-      (p.date ? '<div class="photo-date">' + escapeHtml(p.date) + '</div>' : '') +
-      '</div>';
-  }).join('');
-
-  // Store for fullscreen viewing
-  window._galleryPhotos = allPhotos;
-}
-
-async function renderCharacters() {
-  var items = await dbGetAll('characters');
-  var list = document.getElementById('characterList');
-  var empty = document.getElementById('characterEmpty');
-
-  if (items.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  list.innerHTML = items.map(function(item) {
-    var img = item.photo
-      ? '<img src="' + escapeHtml(item.photo) + '" class="w-12 h-12 rounded-full object-cover flex-shrink-0" />'
-      : '<div class="w-12 h-12 rounded-full bg-blush-100 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-user text-blush-300"></i></div>';
-    return '<div class="character-card" onclick="viewCharacter(\'' + item.id + '\')">' +
-      img +
-      '<div class="flex-1 min-w-0">' +
-      '<p class="font-semibold text-charcoal-800 text-sm truncate">' + escapeHtml(item.name) + '</p>' +
-      '<p class="text-xs text-blush-400 truncate">' + escapeHtml(item.role || '') + '</p>' +
-      '</div>' +
-      '<button class="btn-danger" onclick="event.stopPropagation();deleteItem(\'characters\',\'' + item.id + '\',\'character\')"><i class="fa-solid fa-trash-can"></i></button>' +
-      '</div>';
-  }).join('');
-}
-
-async function renderLocations() {
-  var items = await dbGetAll('locations');
-  var list = document.getElementById('locationList');
-  var empty = document.getElementById('locationEmpty');
-
-  if (items.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  list.innerHTML = items.map(function(item) {
-    var img = item.coverPhoto
-      ? '<img src="' + escapeHtml(item.coverPhoto) + '" class="w-full h-28 object-cover" />'
-      : '<div class="w-full h-28 bg-sage-100 flex items-center justify-center"><i class="fa-solid fa-map-pin text-sage-300 text-xl"></i></div>';
-    return '<div class="location-card">' +
-      '<button class="delete-btn-abs" onclick="deleteItem(\'locations\',\'' + item.id + '\',\'location\')"><i class="fa-solid fa-xmark"></i></button>' +
-      img +
-      '<div class="p-3"><p class="font-semibold text-charcoal-800 text-sm truncate">' + escapeHtml(item.name) + '</p>' +
-      (item.history ? '<p class="text-xs text-charcoal-600 mt-1 line-clamp-2">' + escapeHtml(item.history) + '</p>' : '') +
-      '</div></div>';
-  }).join('');
-}
-
-async function renderJokes() {
-  var items = await dbGetAll('jokes');
-  var list = document.getElementById('jokeList');
-  var empty = document.getElementById('jokeEmpty');
-
-  if (items.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  list.innerHTML = items.map(function(item) {
-    return '<div class="joke-card">' +
-      '<p class="font-bold text-charcoal-800 text-sm">' + escapeHtml(item.term) + '</p>' +
-      (item.definition ? '<p class="text-sm text-charcoal-600 italic mt-1">' + escapeHtml(item.definition) + '</p>' : '') +
-      (item.originStory ? '<p class="text-xs text-charcoal-600 mt-2 leading-relaxed">' + escapeHtml(item.originStory) + '</p>' : '') +
-      '<div class="joke-card-footer">' +
-        '<button class="btn-danger" onclick="deleteItem(\'jokes\',\'' + item.id + '\',\'joke\')"><i class="fa-solid fa-trash-can mr-0.5"></i> Delete</button>' +
-      '</div></div>';
-  }).join('');
-}
-
-async function renderOpenWhen() {
-  var items = await dbGetAll('letters');
-  var list = document.getElementById('openWhenList');
-  var empty = document.getElementById('openWhenEmpty');
-
-  if (items.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  list.innerHTML = items.map(function(item) {
-    var locked = !item.opened;
-    var icon = locked ? 'fa-envelope' : 'fa-envelope-open';
-    var lockedClass = locked ? 'locked' : '';
-    return '<div class="envelope-card ' + lockedClass + '" onclick="' + (locked ? 'openLetter(\'' + item.id + '\')' : 'viewLetter(\'' + item.id + '\')') + '">' +
-      '<button class="delete-btn-abs" onclick="event.stopPropagation();deleteItem(\'letters\',\'' + item.id + '\',\'letter\')"><i class="fa-solid fa-xmark"></i></button>' +
-      '<i class="fa-solid ' + icon + ' text-blush-300 text-2xl mb-2"></i>' +
-      '<div class="envelope-content">' +
-      '<p class="font-semibold text-charcoal-800 text-xs mb-1">' + escapeHtml(item.title) + '</p>' +
-      (locked ? '<p class="text-[10px] text-charcoal-600">Tap to open</p>' : '<p class="text-[10px] text-sage-400">Opened</p>') +
-      '</div></div>';
-  }).join('');
-}
-
-async function renderCapsules() {
-  var items = await dbGetAll('capsules');
-  var list = document.getElementById('capsuleList');
-  var empty = document.getElementById('capsuleEmpty');
-
-  if (items.length === 0) { list.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  list.innerHTML = items.map(function(item) {
-    var now = Date.now();
-    var unlock = new Date(item.unlockDate).getTime();
-    var locked = now < unlock;
-    var lockedClass = locked ? 'locked' : '';
-
-    var statusHtml = '';
-    if (locked) {
-      statusHtml = '<div class="countdown mt-2" id="countdown_' + item.id + '"></div>';
-    } else {
-      statusHtml = '<p class="text-[10px] text-sage-400 mt-1">Ready to open</p>';
-    }
-
-    return '<div class="capsule-card ' + lockedClass + '" data-unlock="' + item.unlockDate + '" data-id="' + item.id + '" onclick="' + (!locked ? 'viewCapsule(\'' + item.id + '\')' : '') + '">' +
-      '<button class="delete-btn-abs" onclick="event.stopPropagation();deleteItem(\'capsules\',\'' + item.id + '\',\'capsule\')"><i class="fa-solid fa-xmark"></i></button>' +
-      '<i class="fa-solid fa-hourglass-half text-blush-300 text-xl mb-1"></i>' +
-      '<div class="capsule-content">' +
-      '<p class="font-semibold text-charcoal-800 text-xs">' + escapeHtml(item.title) + '</p>' +
-      '</div>' + statusHtml + '</div>';
-  }).join('');
-
-  startCountdowns();
-}
-
-async function renderFirsts() {
-  var items = await dbGetAllSorted('firsts', 'date', false);
-  var timeline = document.getElementById('firstsTimeline');
-  var empty = document.getElementById('firstsEmpty');
-
-  if (items.length === 0) { timeline.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  timeline.innerHTML = items.map(function(item) {
-    return '<div class="first-card">' +
-      '<div class="flex justify-between items-start">' +
-        '<div>' +
-          '<p class="text-xs text-blush-400 font-medium">' + escapeHtml(formatDateShort(item.date)) + '</p>' +
-          '<p class="font-bold text-charcoal-800 text-sm">' + escapeHtml(item.title) + '</p>' +
-          (item.description ? '<p class="text-xs text-charcoal-600 mt-0.5">' + escapeHtml(item.description) + '</p>' : '') +
-        '</div>' +
-        '<button class="btn-danger" onclick="deleteItem(\'firsts\',\'' + item.id + '\',\'milestone\')"><i class="fa-solid fa-trash-can"></i></button>' +
-      '</div></div>';
-  }).join('');
-}
-
-async function renderFightLog() {
-  var items = await dbGetAllSorted('fightlog', 'createdAt', true);
-  var list = document.getElementById('fightLogList');
-
-  if (items.length === 0) { list.innerHTML = ''; return; }
-
-  list.innerHTML = items.map(function(item) {
-    return '<div class="fight-card">' +
-      '<button class="delete-btn-abs" onclick="deleteItem(\'fightlog\',\'' + item.id + '\',\'entry\')"><i class="fa-solid fa-xmark"></i></button>' +
-      '<p class="text-xs text-sage-400 font-medium mb-1">' + escapeHtml(formatDateShort(new Date(item.createdAt).toISOString())) + '</p>' +
-      '<p class="text-sm text-charcoal-800"><span class="font-semibold">What:</span> ' + escapeHtml(item.whatHappened) + '</p>' +
-      (item.howResolved ? '<p class="text-sm text-charcoal-600 mt-1"><span class="font-semibold">Resolved:</span> ' + escapeHtml(item.howResolved) + '</p>' : '') +
-      (item.lessonLearned ? '<p class="text-sm text-charcoal-600 mt-1 italic"><span class="font-semibold not-italic">Lesson:</span> ' + escapeHtml(item.lessonLearned) + '</p>' : '') +
-      '</div>';
-  }).join('');
-}
-
-async function renderBucketList() {
-  var items = await dbGetAll('bucketlist');
-  var activeList = document.getElementById('bucketListActive');
-  var completedList = document.getElementById('bucketListCompleted');
-
-  var active = items.filter(function(i) { return !i.completed; });
-  var completed = items.filter(function(i) { return i.completed; });
-
-  activeList.innerHTML = active.map(function(item) {
-    return '<div class="bucket-item">' +
-      '<div class="bucket-check" onclick="toggleBucket(\'' + item.id + '\')"></div>' +
-      '<div class="flex-1 min-w-0">' +
-      '<p class="bucket-title font-semibold text-charcoal-800 text-sm">' + escapeHtml(item.title) + '</p>' +
-      (item.details ? '<p class="text-xs text-charcoal-600">' + escapeHtml(item.details) + '</p>' : '') +
-      '</div>' +
-      '<button class="btn-danger" onclick="deleteItem(\'bucketlist\',\'' + item.id + '\',\'item\')"><i class="fa-solid fa-trash-can"></i></button>' +
-      '</div>';
-  }).join('');
-
-  completedList.innerHTML = completed.map(function(item) {
-    return '<div class="bucket-item completed">' +
-      '<div class="bucket-check checked" onclick="toggleBucket(\'' + item.id + '\')"><i class="fa-solid fa-check text-[10px]"></i></div>' +
-      '<div class="flex-1 min-w-0">' +
-      '<p class="bucket-title font-semibold text-charcoal-800 text-sm">' + escapeHtml(item.title) + '</p>' +
-      (item.details ? '<p class="text-xs text-charcoal-600">' + escapeHtml(item.details) + '</p>' : '') +
-      '</div>' +
-      '<button class="btn-danger" onclick="deleteItem(\'bucketlist\',\'' + item.id + '\',\'item\')"><i class="fa-solid fa-trash-can"></i></button>' +
-      '</div>';
-  }).join('');
-}
-
-// ---- Photo Grid (old modal, still used by settings) ----
-
-async function renderPhotoGrid() {
-  var memories = await dbGetAll('memories');
-  var letters = await dbGetAll('letters');
-  var capsules = await dbGetAll('capsules');
-  var locations = await dbGetAll('locations');
-  var characters = await dbGetAll('characters');
-
-  var allPhotos = [];
-
-  memories.forEach(function(m) {
-    if (m.photo) allPhotos.push({ src: m.photo, date: m.date || '', title: m.title || '' });
-  });
-  letters.forEach(function(l) {
-    if (l.photo) allPhotos.push({ src: l.photo, date: formatDateShort(new Date(l.createdAt).toISOString()), title: l.title || '' });
-  });
-  capsules.forEach(function(c) {
-    if (c.photo) allPhotos.push({ src: c.photo, date: formatDateShort(new Date(c.createdAt).toISOString()), title: c.title || '' });
-  });
-  locations.forEach(function(l) {
-    if (l.coverPhoto) allPhotos.push({ src: l.coverPhoto, date: '', title: l.name || '' });
-  });
-  characters.forEach(function(c) {
-    if (c.photo) allPhotos.push({ src: c.photo, date: '', title: c.name || '' });
-  });
-
-  var grid = document.getElementById('photoGridContent');
-  var empty = document.getElementById('photoGridEmpty');
-
-  if (allPhotos.length === 0) { grid.innerHTML = ''; empty.style.display = 'block'; return; }
-  empty.style.display = 'none';
-
-  grid.innerHTML = allPhotos.map(function(p) {
-    return '<div class="photo-grid-item"><img src="' + escapeHtml(p.src) + '" alt="" />' +
-      (p.date ? '<div class="photo-date">' + escapeHtml(p.date) + '</div>' : '') +
-      '</div>';
-  }).join('');
-}
-
-// ============================================
-// INTERACTIVE ACTIONS
-// ============================================
-
-// View full image from timeline
-async function viewFullImage(memoryId) {
-  var item = await dbGet('memories', memoryId);
-  if (item && item.photo) {
-    showFullImageViewer(item.photo);
-  }
-}
-
-// View full image from gallery
-function viewFullImageBySrc(idx) {
-  if (window._galleryPhotos && window._galleryPhotos[idx]) {
-    showFullImageViewer(window._galleryPhotos[idx].src);
-  }
-}
-
-function showFullImageViewer(src) {
-  var viewer = document.createElement('div');
-  viewer.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center;cursor:pointer';
-  viewer.onclick = function() { document.body.removeChild(viewer); };
-  viewer.innerHTML = '<img src="' + escapeHtml(src) + '" style="max-width:100%;max-height:100%;object-fit:contain;padding:1rem" /><button style="position:absolute;top:1rem;right:1rem;color:rgba(255,255,255,0.7);font-size:1.5rem;background:none;border:none;cursor:pointer"><i class="fa-solid fa-xmark"></i></button>';
-  document.body.appendChild(viewer);
-}
-
-async function openLetter(id) {
-  var item = await dbGet('letters', id);
-  if (!item) return;
-  if (confirm('Are you ready to open "' + item.title + '"? You can only do this once.')) {
-    item.opened = true;
-    item.updatedAt = Date.now();
-    await saveAndQueue('letters', item);
-    viewLetter(id);
-    renderOpenWhen();
-  }
-}
-
-async function viewLetter(id) {
-  var item = await dbGet('letters', id);
-  if (!item) return;
-  var html = '<p class="text-sm text-charcoal-700 leading-relaxed mb-3">' + escapeHtml(item.body) + '</p>';
-  if (item.photo) html += '<img src="' + escapeHtml(item.photo) + '" alt="" class="w-full rounded-xl" />';
-  showModal('modalCharDetail');
-  document.getElementById('charDetailName').textContent = item.title;
-  document.getElementById('charDetailImg').style.display = 'none';
-  document.getElementById('charDetailRole').textContent = 'A letter for you';
-  document.getElementById('charDetailBio').innerHTML = html;
-  document.getElementById('charDetailEvents').innerHTML = '';
-}
-
-async function viewCapsule(id) {
-  var item = await dbGet('capsules', id);
-  if (!item) return;
-  var html = '<p class="text-sm text-charcoal-700 leading-relaxed mb-3">' + escapeHtml(item.body) + '</p>';
-  if (item.photo) html += '<img src="' + escapeHtml(item.photo) + '" alt="" class="w-full rounded-xl" />';
-  showModal('modalCharDetail');
-  document.getElementById('charDetailName').textContent = item.title;
-  document.getElementById('charDetailImg').style.display = 'none';
-  document.getElementById('charDetailRole').textContent = 'Time Capsule';
-  document.getElementById('charDetailBio').innerHTML = html;
-  document.getElementById('charDetailEvents').innerHTML = '';
-}
-
-async function viewCharacter(id) {
-  var item = await dbGet('characters', id);
-  if (!item) return;
-
-  if (item.photo) {
-    document.getElementById('charDetailImg').src = item.photo;
-    document.getElementById('charDetailImg').style.display = 'block';
-  } else {
-    document.getElementById('charDetailImg').style.display = 'none';
-  }
-  document.getElementById('charDetailName').textContent = item.name;
-  document.getElementById('charDetailRole').textContent = item.role || '';
-  document.getElementById('charDetailBio').textContent = item.bio || '';
-
-  var memories = await dbGetAll('memories');
-  var tags = (item.tags || '').split(',').map(function(t) { return t.trim().toLowerCase(); }).filter(Boolean);
-  var related = memories.filter(function(m) {
-    var mText = ((m.title || '') + ' ' + (m.description || '')).toLowerCase();
-    return tags.some(function(tag) { return mText.includes(tag); });
-  });
-
-  var eventsDiv = document.getElementById('charDetailEvents');
-  if (related.length === 0) {
-    eventsDiv.innerHTML = '<p class="text-xs text-charcoal-600">No linked memories yet</p>';
-  } else {
-    eventsDiv.innerHTML = related.map(function(m) {
-      return '<div class="p-2 bg-cream-50 rounded-lg">' +
-        '<p class="text-xs font-semibold text-charcoal-800">' + escapeHtml(m.title) + '</p>' +
-        '<p class="text-[10px] text-charcoal-600">' + escapeHtml(formatDateShort(m.date)) + '</p>' +
-        '</div>';
-    }).join('');
-  }
-  showModal('modalCharDetail');
-}
-
-async function toggleBucket(id) {
-  var item = await dbGet('bucketlist', id);
-  if (!item) return;
-  item.completed = !item.completed;
-  item.updatedAt = Date.now();
-  await saveAndQueue('bucketlist', item);
-  renderBucketList();
-}
-
-// ---- Audio Player ----
-
-function toggleAudio(audioId, btn) {
-  var audio = document.getElementById(audioId);
-  if (!audio) return;
-  if (audio.paused) {
-    audio.play();
-    btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
-    audio.onended = function() { btn.innerHTML = '<i class="fa-solid fa-play"></i>'; };
-  } else {
-    audio.pause();
-    btn.innerHTML = '<i class="fa-solid fa-play"></i>';
-  }
-}
-
-// ---- Countdowns ----
-
-function startCountdowns() {
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(function() {
-    document.querySelectorAll('.capsule-card[data-unlock]').forEach(function(card) {
-      var unlockDate = card.dataset.unlock;
-      var cd = getCountdown(unlockDate);
-      var cdEl = card.querySelector('.countdown');
-      if (cd.done) {
-        card.classList.remove('locked');
-        if (cdEl) cdEl.innerHTML = '<p class="text-[10px] text-sage-400">Ready!</p>';
-      } else if (cdEl) {
-        cdEl.innerHTML =
-          '<div class="countdown-unit"><span class="num">' + cd.days + '</span><span class="lbl">d</span></div>' +
-          '<div class="countdown-unit"><span class="num">' + cd.hours + '</span><span class="lbl">h</span></div>' +
-          '<div class="countdown-unit"><span class="num">' + cd.minutes + '</span><span class="lbl">m</span></div>' +
-          '<div class="countdown-unit"><span class="num">' + cd.seconds + '</span><span class="lbl">s</span></div>';
-      }
-    });
-  }, 1000);
-}
-
-// ---- Nerd Stats ----
-
-async function updateNerdStats() {
-  var startDate = getStartDate();
-  var daysEl = document.getElementById('statDays');
-  var memEl = document.getElementById('statMemories');
-  var photoEl = document.getElementById('statPhotos');
-
-  if (startDate) daysEl.textContent = daysBetween(startDate);
-
-  var memories = await dbGetAll('memories');
-  // Count only actual memories, not gallery-only photos
-  var realMemories = memories.filter(function(m) { return m.type !== 'gallery_photo'; });
-  memEl.textContent = realMemories.length;
-
-  var photoCount = 0;
-  memories.forEach(function(m) { if (m.photo) photoCount++; });
-  var letters = await dbGetAll('letters');
-  letters.forEach(function(l) { if (l.photo) photoCount++; });
-  var capsules = await dbGetAll('capsules');
-  capsules.forEach(function(c) { if (c.photo) photoCount++; });
-  var locations = await dbGetAll('locations');
-  locations.forEach(function(l) { if (l.coverPhoto) photoCount++; });
-  var characters = await dbGetAll('characters');
-  characters.forEach(function(c) { if (c.photo) photoCount++; });
-  photoEl.textContent = photoCount;
-}
-
-// ---- Settings: Save Start Date ----
-
-document.addEventListener('change', async function(e) {
-  if (e.target.id === 'startDateInput') {
-    setStartDate(e.target.value);
-    updateNerdStats();
-  }
-});
-
-// ---- Override Photo Gallery modal open to render first ----
-
-var _origShowModal = showModal;
-showModal = function(id) {
-  if (id === 'modalPhotoGrid') renderPhotoGrid();
-  if (id === 'modalGalleryUpload') document.getElementById('galleryPhotoDate').value = todayStr();
-  _origShowModal(id);
+/* ============================================
+   LoveLore Social — Main Application
+   A private social media for two
+   ============================================ */
+
+// ---- Firebase Config ----
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBYzWLaHWmLCwiqBLSBnqOYC0MjHqu2OS8",
+    authDomain: "lovelore-f99fb.firebaseapp.com",
+    projectId: "lovelore-f99fb",
+    storageBucket: "lovelore-f99fb.firebasestorage.app",
+    messagingSenderId: "1063866736828",
+    appId: "1:1063866736828:web:7f9f0aaa5cc0ff0d5370b9",
+    measurementId: "G-WFW9FFEJ23"
 };
 
-// ============================================
-// APP INITIALIZATION
-// ============================================
+// ---- App State ----
+let currentUser = null;       // 'A' or 'P'
+let fdb = null;               // Firestore instance
+let fAuth = null;             // Firebase Auth instance
+let postsUnsubscribe = null;  // Real-time listener for posts
+let commentsUnsubscribe = null; // Real-time listener for comments
+let currentPostForComments = null; // Post ID for open comments modal
+let pendingImageData = null;  // Base64 image waiting to be posted
+let selectedUser = null;      // Temp: user selected on login screen
+let lastTapTime = 0;          // Double-tap detection
+let lastTapPostId = null;     // Double-tap target
 
-async function initApp() {
-  var startDate = getStartDate();
-  if (startDate) document.getElementById('startDateInput').value = startDate;
-  document.getElementById('memoryDate').value = todayStr();
-  navigate('home');
-  startSyncEngine();
-  if (navigator.onLine) await signInAnonymously();
-  updateNerdStats();
+// ---- Constants ----
+const USERS = ['A', 'P'];
+const SESSION_KEY = 'lovelore_session';
+const ACCOUNTS_COLLECTION = 'social_accounts';
+const POSTS_COLLECTION = 'social_posts';
+const COMMENTS_COLLECTION = 'social_comments';
+const SETTINGS_COLLECTION = 'social_settings';
+const IMAGE_MAX_WIDTH = 800;
+const IMAGE_QUALITY = 0.6;
+
+// ============ INITIALIZATION ============
+
+document.addEventListener('DOMContentLoaded', () => {
+    initFirebase();
+    checkSession();
+    setupEventListeners();
+});
+
+function initFirebase() {
+    try {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(FIREBASE_CONFIG);
+        }
+        fdb = firebase.firestore();
+        fAuth = firebase.auth();
+
+        // Enable offline persistence
+        fdb.enablePersistence({ synchronizeTabs: true }).catch(err => {
+            if (err.code === 'failed-precondition') {
+                console.warn('Firestore: multiple tabs open');
+            } else if (err.code === 'unimplemented') {
+                console.warn('Firestore: persistence not supported');
+            }
+        });
+
+        // Anonymous sign-in for Firestore access
+        fAuth.signInAnonymously().catch(e => console.error('Auth failed:', e));
+
+        console.log('Firebase initialized');
+    } catch (e) {
+        console.error('Firebase init failed:', e);
+    }
 }
 
-window.addEventListener('DOMContentLoaded', function() {
-  if (hasPin()) {
-    document.getElementById('pinEnterBtn').classList.remove('hidden');
-    document.getElementById('setPinBtn').classList.add('hidden');
-  } else {
-    document.getElementById('pinEnterBtn').classList.add('hidden');
-    document.getElementById('setPinBtn').classList.add('hidden');
-  }
+function checkSession() {
+    try {
+        const session = localStorage.getItem(SESSION_KEY);
+        if (session) {
+            const data = JSON.parse(session);
+            if (data.username && USERS.includes(data.username)) {
+                currentUser = data.username;
+                showMainApp();
+                return;
+            }
+        }
+    } catch (e) {
+        localStorage.removeItem(SESSION_KEY);
+    }
+    // Show login screen (default)
+}
 
-  // Pre-set anniversary date (May 29, 2026 at 1:04 AM)
-  if (!getStartDate()) {
-    setStartDate('2026-05-29');
-  }
-});
+// ============ EVENT LISTENERS ============
+
+function setupEventListeners() {
+    // Avatar selection
+    document.querySelectorAll('.avatar-btn').forEach(btn => {
+        btn.addEventListener('click', () => handleAvatarSelect(btn.dataset.user));
+    });
+
+    // Set password
+    document.getElementById('setPasswordBtn').addEventListener('click', handleSetPassword);
+    document.getElementById('confirmPassword').addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleSetPassword();
+    });
+
+    // Login
+    document.getElementById('loginBtn').addEventListener('click', handleLogin);
+    document.getElementById('loginPassword').addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    // Back button
+    document.getElementById('backToAvatar').addEventListener('click', () => {
+        document.getElementById('passwordSection').style.display = 'none';
+        document.getElementById('avatarSection').style.display = 'block';
+        clearAuthErrors();
+    });
+
+    // FAB
+    document.getElementById('fabCreate').addEventListener('click', openCreatePostModal);
+
+    // Create post modal
+    document.getElementById('closeCreatePost').addEventListener('click', closeCreatePostModal);
+    document.getElementById('postBtn').addEventListener('click', createPost);
+    document.getElementById('postText').addEventListener('input', updatePostBtnState);
+    document.getElementById('imageInput').addEventListener('change', handleImageSelect);
+    document.getElementById('removeImage').addEventListener('click', removeSelectedImage);
+
+    // Comments modal
+    document.getElementById('closeComments').addEventListener('click', closeCommentsModal);
+    document.getElementById('sendComment').addEventListener('click', addComment);
+    document.getElementById('commentInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addComment();
+    });
+    document.getElementById('commentInput').addEventListener('input', updateSendBtnState);
+
+    // Image viewer
+    document.getElementById('closeViewer').addEventListener('click', closeImageViewer);
+
+    // Navigation
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchScreen(btn.dataset.screen));
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+
+    // Modal overlay click to close
+    document.getElementById('createPostModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeCreatePostModal();
+    });
+    document.getElementById('commentsModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) closeCommentsModal();
+    });
+
+    // Online/offline
+    window.addEventListener('online', () => updateSyncDot('synced'));
+    window.addEventListener('offline', () => updateSyncDot('offline'));
+}
+
+// ============ AUTH SYSTEM ============
+
+async function handleAvatarSelect(user) {
+    selectedUser = user;
+    const lower = user.toLowerCase();
+
+    // Visual feedback
+    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelector(`.avatar-btn[data-user="${user}"]`).classList.add('selected');
+
+    try {
+        updateSyncDot('syncing');
+        // Check if account exists in Firestore
+        const doc = await fdb.collection(ACCOUNTS_COLLECTION).doc(lower).get();
+
+        // Set avatar styles
+        const avatarClass = `user-${lower}`;
+        document.getElementById('setPassAvatar').className = `mini-avatar ${avatarClass}`;
+        document.getElementById('setPassAvatar').textContent = user;
+        document.getElementById('loginAvatar').className = `mini-avatar ${avatarClass}`;
+        document.getElementById('loginAvatar').textContent = user;
+        document.getElementById('loginUserName').textContent = user;
+
+        if (doc.exists && doc.data().passwordHash) {
+            // Returning user — show login form
+            document.getElementById('setPasswordForm').style.display = 'none';
+            document.getElementById('loginForm').style.display = 'block';
+        } else {
+            // First time — show set password form
+            document.getElementById('setPasswordForm').style.display = 'block';
+            document.getElementById('loginForm').style.display = 'none';
+        }
+
+        // Show password section, hide avatar section
+        document.getElementById('avatarSection').style.display = 'none';
+        document.getElementById('passwordSection').style.display = 'block';
+        document.getElementById('passwordSection').style.animation = 'fadeInUp 0.3s ease-out';
+
+        updateSyncDot('synced');
+    } catch (e) {
+        console.error('Account check failed:', e);
+        showToast('Connection error. Try again.');
+        updateSyncDot('error');
+    }
+}
+
+async function handleSetPassword() {
+    const pass = document.getElementById('newPassword').value;
+    const confirm = document.getElementById('confirmPassword').value;
+
+    if (!pass || pass.length < 1) {
+        showAuthError('setPassError', 'Please enter a password');
+        return;
+    }
+    if (pass !== confirm) {
+        showAuthError('setPassError', 'Passwords don\'t match');
+        return;
+    }
+
+    try {
+        updateSyncDot('syncing');
+        const hash = await hashPassword(pass);
+        await fdb.collection(ACCOUNTS_COLLECTION).doc(selectedUser.toLowerCase()).set({
+            username: selectedUser,
+            passwordHash: hash,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        currentUser = selectedUser;
+        saveSession(currentUser);
+        showMainApp();
+        showToast('Welcome to LoveLore! 💕');
+        updateSyncDot('synced');
+    } catch (e) {
+        console.error('Set password failed:', e);
+        showAuthError('setPassError', 'Something went wrong. Try again.');
+        updateSyncDot('error');
+    }
+}
+
+async function handleLogin() {
+    const pass = document.getElementById('loginPassword').value;
+
+    if (!pass) {
+        showAuthError('loginError', 'Please enter your password');
+        return;
+    }
+
+    try {
+        updateSyncDot('syncing');
+        const doc = await fdb.collection(ACCOUNTS_COLLECTION).doc(selectedUser.toLowerCase()).get();
+
+        if (!doc.exists || !doc.data().passwordHash) {
+            showAuthError('loginError', 'Account not found');
+            updateSyncDot('error');
+            return;
+        }
+
+        const hash = await hashPassword(pass);
+        if (hash === doc.data().passwordHash) {
+            currentUser = selectedUser;
+            saveSession(currentUser);
+            showMainApp();
+            showToast('Welcome back! 💕');
+            updateSyncDot('synced');
+        } else {
+            showAuthError('loginError', 'Wrong password');
+            updateSyncDot('error');
+        }
+    } catch (e) {
+        console.error('Login failed:', e);
+        showAuthError('loginError', 'Something went wrong. Try again.');
+        updateSyncDot('error');
+    }
+}
+
+async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password + '_lovelore_salt_2024');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function saveSession(username) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ username, ts: Date.now() }));
+}
+
+function handleLogout() {
+    if (postsUnsubscribe) postsUnsubscribe();
+    if (commentsUnsubscribe) commentsUnsubscribe();
+    postsUnsubscribe = null;
+    commentsUnsubscribe = null;
+    currentUser = null;
+    selectedUser = null;
+    localStorage.removeItem(SESSION_KEY);
+
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('avatarSection').style.display = 'block';
+    document.getElementById('passwordSection').style.display = 'none';
+    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+    clearAuthFields();
+    clearAuthErrors();
+}
+
+function showAuthError(elementId, message) {
+    const el = document.getElementById(elementId);
+    el.textContent = message;
+    el.style.display = 'block';
+}
+
+function clearAuthErrors() {
+    document.getElementById('setPassError').style.display = 'none';
+    document.getElementById('loginError').style.display = 'none';
+}
+
+function clearAuthFields() {
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('loginPassword').value = '';
+}
+
+// ============ MAIN APP ============
+
+function showMainApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+
+    // Set user-specific styles
+    const lower = currentUser.toLowerCase();
+    const avatarClass = `user-${lower}`;
+    document.getElementById('createPostAvatar').className = `mini-avatar ${avatarClass}`;
+    document.getElementById('createPostAvatar').textContent = currentUser;
+    document.getElementById('createPostUser').textContent = currentUser;
+    document.getElementById('commentAvatar').className = `mini-avatar tiny ${avatarClass}`;
+    document.getElementById('commentAvatar').textContent = currentUser;
+
+    // Start real-time listeners
+    attachPostsListener();
+    loadAnniversary();
+    renderProfile();
+}
+
+// ============ REAL-TIME POSTS ============
+
+function attachPostsListener() {
+    if (postsUnsubscribe) postsUnsubscribe();
+
+    updateSyncDot('syncing');
+    document.getElementById('feedLoader').style.display = 'flex';
+
+    postsUnsubscribe = fdb.collection(POSTS_COLLECTION)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snapshot => {
+            const posts = [];
+            snapshot.forEach(doc => {
+                posts.push({ id: doc.id, ...doc.data() });
+            });
+            renderFeed(posts);
+            document.getElementById('feedLoader').style.display = 'none';
+            updateSyncDot('synced');
+        }, error => {
+            console.error('Posts listener error:', error);
+            document.getElementById('feedLoader').style.display = 'none';
+            updateSyncDot('error');
+        });
+}
+
+// ============ FEED RENDERING ============
+
+function renderFeed(posts) {
+    const container = document.getElementById('postsContainer');
+    const emptyState = document.getElementById('emptyFeed');
+
+    if (!posts || posts.length === 0) {
+        container.innerHTML = '';
+        emptyState.classList.add('show');
+        return;
+    }
+
+    emptyState.classList.remove('show');
+    container.innerHTML = posts.map(post => renderPostCard(post)).join('');
+
+    // Attach event listeners to post actions
+    container.querySelectorAll('.like-btn').forEach(btn => {
+        btn.addEventListener('click', () => toggleLike(btn.dataset.postId, btn.dataset.postAuthor));
+    });
+
+    container.querySelectorAll('.comment-btn').forEach(btn => {
+        btn.addEventListener('click', () => openCommentsModal(btn.dataset.postId));
+    });
+
+    container.querySelectorAll('.post-image-wrapper').forEach(wrapper => {
+        wrapper.addEventListener('click', (e) => {
+            // Double-tap detection for like
+            const postId = wrapper.dataset.postId;
+            const postAuthor = wrapper.dataset.postAuthor;
+            const now = Date.now();
+
+            if (lastTapPostId === postId && (now - lastTapTime) < 300) {
+                // Double tap! Like the post
+                handleDoubleTapLike(postId, postAuthor);
+                lastTapTime = 0;
+                lastTapPostId = null;
+            } else {
+                // Single tap — open image viewer after short delay
+                lastTapTime = now;
+                lastTapPostId = postId;
+
+                setTimeout(() => {
+                    if (lastTapPostId === postId && lastTapTime === now) {
+                        const img = wrapper.querySelector('img');
+                        if (img) openImageViewer(img.src);
+                    }
+                }, 300);
+            }
+        });
+    });
+
+    container.querySelectorAll('.post-comment-preview').forEach(el => {
+        el.addEventListener('click', () => openCommentsModal(el.dataset.postId));
+    });
+}
+
+function renderPostCard(post) {
+    const lower = (post.author || 'a').toLowerCase();
+    const avatarClass = `user-${lower}`;
+    const isLiked = post.likes && post.likes[currentUser.toLowerCase()];
+    const likeCount = post.likes ? Object.keys(post.likes).length : 0;
+    const commentCount = post.commentCount || 0;
+    const timeStr = timeAgo(post.createdAt);
+
+    let imageHtml = '';
+    if (post.imageData) {
+        imageHtml = `
+            <div class="post-image-wrapper" data-post-id="${post.id}" data-post-author="${post.author}">
+                <img src="${post.imageData}" alt="Post image" loading="lazy">
+            </div>`;
+    }
+
+    let likeText = '';
+    if (likeCount === 1) {
+        likeText = '1 like';
+    } else if (likeCount > 1) {
+        likeText = likeCount + ' likes';
+    }
+
+    let commentPreview = '';
+    if (commentCount > 0) {
+        commentPreview = `
+            <div class="post-comment-preview" data-post-id="${post.id}">
+                View ${commentCount === 1 ? 'comment' : 'all ' + commentCount + ' comments'}
+            </div>`;
+    }
+
+    let textHtml = '';
+    if (post.text) {
+        textHtml = `<div class="post-text-content">${escapeHtml(post.text)}</div>`;
+    }
+
+    return `
+        <div class="post-card" data-post-id="${post.id}">
+            <div class="post-header">
+                <div class="post-avatar ${avatarClass}">${post.author || '?'}</div>
+                <div class="post-user-info">
+                    <div class="post-author">${escapeHtml(post.author || 'Unknown')}</div>
+                    <div class="post-time">${timeStr}</div>
+                </div>
+            </div>
+            ${imageHtml}
+            ${textHtml}
+            <div class="post-actions">
+                <button class="post-action-btn like-btn ${isLiked ? 'liked' : ''}" data-post-id="${post.id}" data-post-author="${post.author}">
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
+                </button>
+                <button class="post-action-btn comment-btn" data-post-id="${post.id}">
+                    <i class="far fa-comment"></i>
+                </button>
+            </div>
+            ${likeText ? `<div class="post-likes-text">${likeText}</div>` : ''}
+            ${commentPreview}
+        </div>`;
+}
+
+// ============ LIKES ============
+
+async function toggleLike(postId, postAuthor) {
+    try {
+        const postRef = fdb.collection(POSTS_COLLECTION).doc(postId);
+        const doc = await postRef.get();
+        if (!doc.exists) return;
+
+        const likes = doc.data().likes || {};
+        const userKey = currentUser.toLowerCase();
+
+        if (likes[userKey]) {
+            // Unlike
+            await postRef.update({
+                [`likes.${userKey}`]: firebase.firestore.FieldValue.delete()
+            });
+        } else {
+            // Like
+            await postRef.update({
+                [`likes.${userKey}`]: true
+            });
+        }
+    } catch (e) {
+        console.error('Toggle like failed:', e);
+    }
+}
+
+function handleDoubleTapLike(postId, postAuthor) {
+    // Show heart animation
+    const heart = document.getElementById('doubleTapHeart');
+    heart.classList.remove('show');
+    void heart.offsetWidth; // Force reflow
+    heart.style.display = 'block';
+    heart.classList.add('show');
+
+    setTimeout(() => {
+        heart.style.display = 'none';
+        heart.classList.remove('show');
+    }, 800);
+
+    // Like the post (if not already liked)
+    const postCard = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+    if (postCard) {
+        const likeBtn = postCard.querySelector('.like-btn');
+        if (likeBtn && !likeBtn.classList.contains('liked')) {
+            toggleLike(postId, postAuthor);
+        }
+    }
+}
+
+// ============ COMMENTS ============
+
+function openCommentsModal(postId) {
+    currentPostForComments = postId;
+    document.getElementById('commentsModal').style.display = 'flex';
+    document.getElementById('commentInput').value = '';
+    updateSendBtnState();
+    loadComments(postId);
+}
+
+function closeCommentsModal() {
+    document.getElementById('commentsModal').style.display = 'none';
+    if (commentsUnsubscribe) {
+        commentsUnsubscribe();
+        commentsUnsubscribe = null;
+    }
+    currentPostForComments = null;
+}
+
+function loadComments(postId) {
+    if (commentsUnsubscribe) commentsUnsubscribe();
+
+    commentsUnsubscribe = fdb.collection(COMMENTS_COLLECTION)
+        .where('postId', '==', postId)
+        .orderBy('createdAt', 'asc')
+        .onSnapshot(snapshot => {
+            const comments = [];
+            snapshot.forEach(doc => {
+                comments.push({ id: doc.id, ...doc.data() });
+            });
+            renderComments(comments);
+        }, error => {
+            console.error('Comments listener error:', error);
+        });
+}
+
+function renderComments(comments) {
+    const list = document.getElementById('commentsList');
+
+    if (!comments || comments.length === 0) {
+        list.innerHTML = '<div class="comments-empty"><p>No comments yet. Say something sweet!</p></div>';
+        return;
+    }
+
+    list.innerHTML = comments.map(c => {
+        const lower = (c.author || 'a').toLowerCase();
+        const avatarClass = `user-${lower}`;
+        return `
+            <div class="comment-item">
+                <div class="comment-avatar ${avatarClass}">${c.author || '?'}</div>
+                <div class="comment-body">
+                    <span class="comment-author">${escapeHtml(c.author || 'Unknown')}</span>
+                    <div class="comment-text">${escapeHtml(c.text || '')}</div>
+                    <div class="comment-time">${timeAgo(c.createdAt)}</div>
+                </div>
+            </div>`;
+    }).join('');
+
+    // Scroll to bottom
+    list.scrollTop = list.scrollHeight;
+}
+
+async function addComment() {
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text || !currentPostForComments) return;
+
+    try {
+        input.value = '';
+        updateSendBtnState();
+
+        await fdb.collection(COMMENTS_COLLECTION).add({
+            postId: currentPostForComments,
+            author: currentUser,
+            text: text,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Increment comment count on the post
+        await fdb.collection(POSTS_COLLECTION).doc(currentPostForComments).update({
+            commentCount: firebase.firestore.FieldValue.increment(1)
+        });
+    } catch (e) {
+        console.error('Add comment failed:', e);
+        showToast('Failed to post comment');
+        input.value = text; // Restore
+    }
+}
+
+function updateSendBtnState() {
+    const input = document.getElementById('commentInput');
+    const btn = document.getElementById('sendComment');
+    btn.disabled = !input.value.trim();
+}
+
+// ============ CREATE POST ============
+
+function openCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'flex';
+    document.getElementById('postText').value = '';
+    document.getElementById('postText').focus();
+    pendingImageData = null;
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('imageInput').value = '';
+    updatePostBtnState();
+}
+
+function closeCreatePostModal() {
+    document.getElementById('createPostModal').style.display = 'none';
+    pendingImageData = null;
+}
+
+async function handleImageSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Check file size (max 5MB before compression)
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('Image too large. Max 5MB.');
+        return;
+    }
+
+    try {
+        const compressed = await compressImage(file);
+        pendingImageData = compressed;
+        document.getElementById('previewImg').src = compressed;
+        document.getElementById('imagePreview').style.display = 'block';
+        updatePostBtnState();
+    } catch (err) {
+        console.error('Image compression failed:', err);
+        showToast('Failed to process image');
+    }
+}
+
+function removeSelectedImage() {
+    pendingImageData = null;
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('imageInput').value = '';
+    updatePostBtnState();
+}
+
+function updatePostBtnState() {
+    const text = document.getElementById('postText').value.trim();
+    const btn = document.getElementById('postBtn');
+    btn.disabled = !text && !pendingImageData;
+}
+
+async function createPost() {
+    const text = document.getElementById('postText').value.trim();
+    if (!text && !pendingImageData) return;
+
+    const btn = document.getElementById('postBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+
+    try {
+        const postData = {
+            author: currentUser,
+            text: text || '',
+            imageData: pendingImageData || null,
+            likes: {},
+            commentCount: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        await fdb.collection(POSTS_COLLECTION).add(postData);
+        closeCreatePostModal();
+        showToast('Posted! 💕');
+    } catch (e) {
+        console.error('Create post failed:', e);
+        showToast('Failed to post. Try again.');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Post';
+    }
+}
+
+// ============ IMAGE COMPRESSION ============
+
+function compressImage(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let w = img.width;
+                let h = img.height;
+
+                if (w > IMAGE_MAX_WIDTH) {
+                    h = Math.round((h * IMAGE_MAX_WIDTH) / w);
+                    w = IMAGE_MAX_WIDTH;
+                }
+
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', IMAGE_QUALITY);
+                resolve(dataUrl);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// ============ IMAGE VIEWER ============
+
+function openImageViewer(src) {
+    document.getElementById('viewerImg').src = src;
+    document.getElementById('imageViewer').style.display = 'flex';
+}
+
+function closeImageViewer() {
+    document.getElementById('imageViewer').style.display = 'none';
+}
+
+// ============ PROFILE ============
+
+function renderProfile() {
+    if (!currentUser) return;
+
+    const lower = currentUser.toLowerCase();
+    const avatarClass = `user-${lower}`;
+    const container = document.getElementById('profileContent');
+
+    container.innerHTML = `
+        <div class="profile-card">
+            <div class="profile-avatar-large ${avatarClass}">${currentUser}</div>
+            <div class="profile-name">${escapeHtml(currentUser)}</div>
+            <div class="profile-joined">Member of LoveLore</div>
+            <button class="anni-edit-btn" id="editAnniversaryBtn" onclick="openAnniversaryEditor()">
+                <i class="fas fa-calendar-heart"></i> Set Anniversary
+            </button>
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <div class="profile-stat-number" id="profilePostCount">0</div>
+                    <div class="profile-stat-label">Posts</div>
+                </div>
+                <div class="profile-stat">
+                    <div class="profile-stat-number" id="profileLikeCount">0</div>
+                    <div class="profile-stat-label">Likes received</div>
+                </div>
+            </div>
+        </div>
+        <div class="profile-section-title">My Posts</div>
+        <div id="profileGrid" class="profile-grid"></div>
+        <div id="profileEmptyPosts" class="profile-empty-posts">No posts yet. Share your first moment!</div>
+    `;
+
+    // Load profile stats
+    loadProfileStats();
+}
+
+function loadProfileStats() {
+    // Listen to all posts for this user
+    fdb.collection(POSTS_COLLECTION)
+        .where('author', '==', currentUser)
+        .orderBy('createdAt', 'desc')
+        .onSnapshot(snapshot => {
+            let postCount = 0;
+            let likeCount = 0;
+            const imagePosts = [];
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                postCount++;
+                likeCount += (data.likes ? Object.keys(data.likes).length : 0);
+                if (data.imageData) {
+                    imagePosts.push(data);
+                }
+            });
+
+            // Update stats
+            const postEl = document.getElementById('profilePostCount');
+            const likeEl = document.getElementById('profileLikeCount');
+            if (postEl) postEl.textContent = postCount;
+            if (likeEl) likeEl.textContent = likeCount;
+
+            // Update grid
+            const grid = document.getElementById('profileGrid');
+            const emptyEl = document.getElementById('profileEmptyPosts');
+            if (!grid) return;
+
+            if (imagePosts.length > 0) {
+                grid.innerHTML = imagePosts.map(p => `
+                    <div class="profile-grid-item" data-image="${p.imageData}">
+                        <img src="${p.imageData}" alt="Post" loading="lazy">
+                    </div>
+                `).join('');
+                grid.style.display = 'grid';
+                if (emptyEl) emptyEl.style.display = 'none';
+
+                // Click to view image
+                grid.querySelectorAll('.profile-grid-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        openImageViewer(item.dataset.image);
+                    });
+                });
+            } else {
+                grid.style.display = 'none';
+                if (emptyEl) emptyEl.style.display = 'block';
+            }
+        });
+}
+
+// ============ ANNIVERSARY COUNTER ============
+
+function loadAnniversary() {
+    fdb.collection(SETTINGS_COLLECTION).doc('anniversary').onSnapshot(doc => {
+        if (doc.exists && doc.data().date) {
+            renderAnniversary(doc.data().date);
+        } else {
+            // No anniversary set yet — show setup prompt in profile
+            document.getElementById('anniversaryBanner').style.display = 'none';
+        }
+    });
+}
+
+function renderAnniversary(dateStr) {
+    const anniversary = new Date(dateStr);
+    const now = new Date();
+
+    // Calculate days
+    const diffMs = now - anniversary;
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Format the date nicely
+    const dateFormatted = anniversary.toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric'
+    });
+
+    // Update DOM
+    document.getElementById('anniDays').textContent = days;
+    document.getElementById('anniDate').textContent = 'Since ' + dateFormatted;
+    document.getElementById('anniversaryBanner').style.display = 'block';
+}
+
+async function setAnniversary(dateStr) {
+    try {
+        await fdb.collection(SETTINGS_COLLECTION).doc('anniversary').set({
+            date: dateStr,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        showToast('Anniversary saved! 💕');
+    } catch (e) {
+        console.error('Save anniversary failed:', e);
+        showToast('Failed to save anniversary');
+    }
+}
+
+// ============ ANNIVERSARY EDITOR ============
+
+function openAnniversaryEditor() {
+    // Create a simple inline date picker modal
+    const existing = document.getElementById('anniversaryEditorModal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'anniversaryEditorModal';
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+        <div class="modal-sheet" style="max-height:50vh">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-heart" style="color:var(--primary);margin-right:8px"></i>Our Anniversary</h2>
+                <button class="modal-close" onclick="document.getElementById('anniversaryEditorModal').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:0 20px 20px;text-align:center">
+                <p style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">When did your love story begin?</p>
+                <input type="datetime-local" id="anniDateInput" class="input-field" style="padding-left:16px;text-align:center;font-size:16px">
+                <button class="btn-primary" style="margin-top:16px" onclick="saveAnniversaryFromEditor()">
+                    <i class="fas fa-heart"></i> Save
+                </button>
+            </div>
+        </div>
+    `;
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+}
+
+async function saveAnniversaryFromEditor() {
+    const input = document.getElementById('anniDateInput');
+    if (!input || !input.value) {
+        showToast('Please select a date');
+        return;
+    }
+    await setAnniversary(input.value);
+    document.getElementById('anniversaryEditorModal').remove();
+}
+
+// ============ NAVIGATION ============
+
+function switchScreen(screenId) {
+    // Hide all screens
+    document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
+    // Show target
+    document.getElementById(screenId).classList.add('active');
+
+    // Update nav buttons
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.nav-btn[data-screen="${screenId}"]`).classList.add('active');
+
+    // Show/hide FAB
+    if (screenId === 'feedScreen') {
+        document.getElementById('fabCreate').style.display = 'flex';
+    } else {
+        document.getElementById('fabCreate').style.display = 'none';
+    }
+}
+
+// ============ UI HELPERS ============
+
+function updateSyncDot(status) {
+    const dot = document.getElementById('syncDot');
+    if (!dot) return;
+    dot.className = 'sync-dot ' + status;
+}
+
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    toast.style.animation = 'none';
+    void toast.offsetWidth;
+    toast.style.animation = 'toastIn 0.3s ease-out';
+
+    clearTimeout(toast._timeout);
+    toast._timeout = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 2500);
+}
+
+function timeAgo(timestamp) {
+    if (!timestamp) return '';
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const seconds = Math.floor((now - date) / 1000);
+
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return minutes + 'm ago';
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + 'h ago';
+    const days = Math.floor(hours / 24);
+    if (days < 7) return days + 'd ago';
+    const weeks = Math.floor(days / 7);
+    if (weeks < 4) return weeks + 'w ago';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// ============ SERVICE WORKER REGISTRATION ============
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(e => {
+            console.warn('SW registration failed:', e);
+        });
+    });
+}
