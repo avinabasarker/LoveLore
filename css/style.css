@@ -351,6 +351,39 @@ html, body {
 .post-comment-preview { padding: 0 16px 12px; font-size: 13px; color: var(--text-light); cursor: pointer; }
 .post-comment-preview:hover { color: var(--primary); }
 
+/* Delete Post Button */
+.post-delete-btn {
+    width: 32px; height: 32px; border: none; background: none;
+    color: var(--text-light); font-size: 13px; cursor: pointer;
+    border-radius: var(--radius-full); display: flex;
+    align-items: center; justify-content: center;
+    transition: var(--transition); flex-shrink: 0;
+}
+.post-delete-btn:hover { background: var(--primary-light); color: var(--like-red); }
+.post-delete-btn:active { transform: scale(0.9); }
+
+/* Delete Confirmation Bar */
+.post-delete-confirm {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    padding: 10px 16px; background: #FFF0F0; border-top: 1px solid #FFD6D6;
+    animation: fadeIn 0.2s ease-out;
+}
+.post-delete-confirm span { font-size: 13px; color: var(--like-red); font-weight: 500; }
+.confirm-del-yes {
+    padding: 6px 16px; border: none; border-radius: 20px;
+    background: var(--like-red); color: white; font-size: 13px;
+    font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: var(--transition);
+}
+.confirm-del-yes:hover { opacity: 0.85; }
+.confirm-del-no {
+    padding: 6px 16px; border: 1px solid var(--border); border-radius: 20px;
+    background: var(--card); color: var(--text-secondary); font-size: 13px;
+    font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif;
+    transition: var(--transition);
+}
+.confirm-del-no:hover { background: var(--bg-secondary); }
+
 /* Reaction Picker */
 .reaction-picker {
     position: fixed; z-index: 350;
