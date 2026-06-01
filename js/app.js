@@ -302,6 +302,35 @@ function setupEventListeners() {
             btn.classList.add('active');
         });
     });
+    // ---- NEW FEATURE BUTTON WIRING ----
+    // Mood indicator in top bar
+    document.getElementById('moodIndicatorTop').addEventListener('click', openMoodSetter);
+    // Capsules tab: add buttons
+    document.getElementById('addCountdownBtn').addEventListener('click', openCountdownModal);
+    document.getElementById('addCapsuleBtn').addEventListener('click', openCapsuleCreateModal);
+    // Capsule create modal: close + seal button + remove image
+    document.getElementById('closeCapsuleCreate').addEventListener('click', closeCapsuleCreateModal);
+    document.getElementById('createCapsuleBtn').addEventListener('click', createCapsule);
+    document.getElementById('removeCapsuleImage').addEventListener('click', removeCapsuleImage);
+    // Capsule view modal: close
+    document.getElementById('closeCapsuleView').addEventListener('click', closeCapsuleViewModal);
+    // Countdown modal: close + create button
+    document.getElementById('closeCountdownModal').addEventListener('click', closeCountdownModal);
+    document.getElementById('createCountdownBtn').addEventListener('click', createCountdown);
+    // Mood modal: close + set button + mood options
+    document.getElementById('closeMoodModal').addEventListener('click', closeMoodModal);
+    document.getElementById('setMoodBtn').addEventListener('click', setMood);
+    document.querySelectorAll('.mood-opt').forEach(opt => {
+        opt.addEventListener('click', () => {
+            document.querySelectorAll('.mood-opt').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            selectedMood = opt.dataset.mood;
+        });
+    });
+    // Daily note modal: close + send + banner click
+    document.getElementById('closeDailyNoteModal').addEventListener('click', closeDailyNoteModal);
+    document.getElementById('sendDailyNoteBtn').addEventListener('click', submitDailyNote);
+    document.getElementById('dailyNoteBanner').addEventListener('click', openDailyNoteModal);
     // Close modals on overlay click
     ['capsuleCreateModal', 'capsuleViewModal', 'countdownModal', 'moodModal', 'dailyNoteModal'].forEach(id => {
         document.getElementById(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
@@ -1214,14 +1243,6 @@ function openMoodSetter() {
         opt.classList.toggle('active', opt.dataset.mood === selectedMood);
     });
     document.getElementById('moodCustomText').value = (myMood && myMood.customText) || '';
-    // Setup mood option clicks
-    document.querySelectorAll('.mood-opt').forEach(opt => {
-        opt.onclick = () => {
-            document.querySelectorAll('.mood-opt').forEach(o => o.classList.remove('active'));
-            opt.classList.add('active');
-            selectedMood = opt.dataset.mood;
-        };
-    });
 }
 
 function closeMoodModal() { document.getElementById('moodModal').style.display = 'none'; }
