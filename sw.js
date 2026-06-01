@@ -3,8 +3,8 @@
    Offline-first with smart caching
    ============================================ */
 
-const CACHE_NAME = 'lovelore-v2';
-const RUNTIME_CACHE = 'lovelore-runtime-v2';
+const CACHE_NAME = 'lovelore-v3';
+const RUNTIME_CACHE = 'lovelore-runtime-v3';
 
 // Core app files to pre-cache on install
 const APP_SHELL = [
@@ -12,7 +12,9 @@ const APP_SHELL = [
     './index.html',
     './css/style.css',
     './js/app.js',
-    './manifest.json'
+    './manifest.json',
+    './icons/icon-192.png',
+    './icons/icon-512.png'
 ];
 
 // External resources to cache on first use
