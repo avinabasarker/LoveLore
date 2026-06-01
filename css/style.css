@@ -243,6 +243,19 @@ html, body {
 .sync-dot.error { background: var(--like-red); box-shadow: 0 0 6px rgba(255, 77, 109, 0.5); }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
+/* Offline Banner */
+.offline-banner {
+    position: fixed; bottom: 60px; left: 0; right: 0;
+    background: linear-gradient(135deg, #FF9A76, #FF6B8A);
+    color: white; padding: 8px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    font-size: 12px; font-weight: 500; z-index: 250;
+    box-shadow: 0 -2px 12px rgba(255, 107, 138, 0.3);
+    animation: slideUp 0.3s ease-out;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+.offline-banner i { font-size: 14px; }
+
 /* App Screens */
 .app-screen {
     position: fixed; top: 56px; left: 0; right: 0; bottom: 60px;
