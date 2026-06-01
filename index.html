@@ -41,9 +41,8 @@
                 </div>
             </div>
 
-            <!-- Password Section (appears after selecting user) -->
+            <!-- Password Section -->
             <div id="passwordSection" class="password-section">
-                <!-- Set Password (first time) -->
                 <div id="setPasswordForm" class="auth-form" style="display:none">
                     <div class="auth-header">
                         <div id="setPassAvatar" class="mini-avatar">A</div>
@@ -63,7 +62,6 @@
                     </button>
                 </div>
 
-                <!-- Login (returning user) -->
                 <div id="loginForm" class="auth-form" style="display:none">
                     <div class="auth-header">
                         <div id="loginAvatar" class="mini-avatar">A</div>
@@ -86,6 +84,46 @@
         </div>
     </div>
 
+    <!-- ============ ENCRYPTION SETUP ============ -->
+    <div id="encryptionScreen" class="screen" style="display:none">
+        <div class="login-bg-hearts"></div>
+        <div class="login-container">
+            <div class="enc-setup-content">
+                <div class="enc-icon"><i class="fas fa-shield-heart"></i></div>
+                <h2 class="enc-title">Private Mode</h2>
+                <p class="enc-desc">Set a shared secret phrase. Both you and your partner must use the same phrase to encrypt your data.</p>
+
+                <!-- Set new secret -->
+                <div id="setSecretForm" style="display:none">
+                    <div class="input-group">
+                        <i class="fas fa-key input-icon"></i>
+                        <input type="password" id="newSecret" placeholder="Shared secret phrase" class="input-field" autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <i class="fas fa-key input-icon"></i>
+                        <input type="password" id="confirmSecret" placeholder="Confirm secret phrase" class="input-field" autocomplete="off">
+                    </div>
+                    <p id="secretError" class="auth-error" style="display:none"></p>
+                    <button id="setSecretBtn" class="btn-primary">
+                        <i class="fas fa-lock"></i> Encrypt & Continue
+                    </button>
+                </div>
+
+                <!-- Enter existing secret -->
+                <div id="unlockSecretForm" style="display:none">
+                    <div class="input-group">
+                        <i class="fas fa-key input-icon"></i>
+                        <input type="password" id="unlockSecret" placeholder="Enter shared secret" class="input-field" autocomplete="off">
+                    </div>
+                    <p id="unlockError" class="auth-error" style="display:none"></p>
+                    <button id="unlockSecretBtn" class="btn-primary">
+                        <i class="fas fa-unlock"></i> Unlock
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ MAIN APP ============ -->
     <div id="mainApp" class="screen" style="display:none">
 
@@ -96,6 +134,9 @@
                 <h1 class="top-bar-title">LoveLore</h1>
             </div>
             <div class="top-bar-right">
+                <div id="moodIndicatorTop" class="mood-indicator-top" title="Set mood" onclick="openMoodSetter()">
+                    <span id="moodEmojiTop">😊</span>
+                </div>
                 <span id="syncDot" class="sync-dot synced" title="Synced"></span>
                 <button id="logoutBtn" class="top-bar-btn" title="Logout">
                     <i class="fas fa-sign-out-alt"></i>
@@ -103,7 +144,7 @@
             </div>
         </header>
 
-        <!-- Feed Screen -->
+        <!-- Feed Screen (Home) -->
         <div id="feedScreen" class="app-screen active">
             <!-- Anniversary Banner -->
             <div id="anniversaryBanner" class="anniversary-banner" style="display:none">
@@ -124,9 +165,26 @@
                 </div>
             </div>
 
-            <div id="postsContainer" class="posts-container">
-                <!-- Posts rendered here by JS -->
+            <!-- Daily Love Note Banner -->
+            <div id="dailyNoteBanner" class="daily-note-banner" style="display:none">
+                <div class="daily-note-icon"><i class="fas fa-feather-pointed"></i></div>
+                <div class="daily-note-text">
+                    <div class="daily-note-label">Today's Love Note</div>
+                    <div class="daily-note-prompt" id="dailyNotePrompt"></div>
+                </div>
+                <div class="daily-note-action" id="dailyNoteAction">
+                    <i class="fas fa-pen"></i>
+                </div>
             </div>
+
+            <!-- Partner Mood Bar -->
+            <div id="partnerMoodBar" class="partner-mood-bar" style="display:none">
+                <div class="partner-mood-avatar" id="partnerMoodAvatar">P</div>
+                <span id="partnerMoodText">feeling loved</span>
+                <span id="partnerMoodEmoji">😊</span>
+            </div>
+
+            <div id="postsContainer" class="posts-container"></div>
             <div id="emptyFeed" class="empty-state">
                 <div class="empty-icon"><i class="fas fa-heart"></i></div>
                 <p class="empty-title">No posts yet</p>
@@ -134,6 +192,44 @@
             </div>
             <div id="feedLoader" class="feed-loader" style="display:none">
                 <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Timeline Screen -->
+        <div id="timelineScreen" class="app-screen">
+            <div id="timelineContent" class="timeline-content">
+                <div id="timelineEmpty" class="timeline-empty">
+                    <div class="empty-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                    <p class="empty-title">No memories yet</p>
+                    <p class="empty-sub">Your moments will appear here on a timeline</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capsules Screen -->
+        <div id="capsulesScreen" class="app-screen">
+            <div class="capsules-content">
+                <!-- Countdown Section -->
+                <div class="capsules-section">
+                    <div class="capsules-section-header">
+                        <h3><i class="fas fa-hourglass-half"></i> Countdowns</h3>
+                        <button class="capsules-add-btn" onclick="openCountdownModal()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="countdownsList" class="countdowns-list">
+                        <div id="countdownsEmpty" class="capsules-empty-sm">No countdowns yet</div>
+                    </div>
+                </div>
+
+                <!-- Time Capsules Section -->
+                <div class="capsules-section">
+                    <div class="capsules-section-header">
+                        <h3><i class="fas fa-gift"></i> Time Capsules</h3>
+                        <button class="capsules-add-btn" onclick="openCapsuleCreateModal()"><i class="fas fa-plus"></i></button>
+                    </div>
+                    <div id="capsulesList" class="capsules-list">
+                        <div id="capsulesEmpty" class="capsules-empty-sm">No capsules yet. Bury a memory for your future selves!</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -151,9 +247,7 @@
 
         <!-- Profile Screen -->
         <div id="profileScreen" class="app-screen">
-            <div id="profileContent" class="profile-content">
-                <!-- Rendered by JS -->
-            </div>
+            <div id="profileContent" class="profile-content"></div>
         </div>
 
         <!-- FAB -->
@@ -161,11 +255,19 @@
             <i class="fas fa-plus"></i>
         </button>
 
-        <!-- Bottom Nav -->
+        <!-- Bottom Nav (5 tabs) -->
         <nav class="bottom-nav">
             <button class="nav-btn active" data-screen="feedScreen">
                 <i class="fas fa-home"></i>
                 <span>Home</span>
+            </button>
+            <button class="nav-btn" data-screen="timelineScreen">
+                <i class="fas fa-clock-rotate-left"></i>
+                <span>Timeline</span>
+            </button>
+            <button class="nav-btn" data-screen="capsulesScreen">
+                <i class="fas fa-gift"></i>
+                <span>Capsules</span>
             </button>
             <button class="nav-btn" data-screen="galleryScreen">
                 <i class="fas fa-images"></i>
@@ -228,6 +330,144 @@
                 <input type="text" id="commentInput" placeholder="Add a comment..." class="comment-input" maxlength="500">
                 <button id="sendComment" class="comment-send" disabled><i class="fas fa-paper-plane"></i></button>
             </div>
+        </div>
+    </div>
+
+    <!-- ============ REACTION PICKER ============ -->
+    <div id="reactionPicker" class="reaction-picker" style="display:none">
+        <button class="reaction-opt" data-reaction="heart" title="Love">❤️</button>
+        <button class="reaction-opt" data-reaction="love" title="Adore">😍</button>
+        <button class="reaction-opt" data-reaction="kiss" title="Kiss">💋</button>
+        <button class="reaction-opt" data-reaction="hug" title="Hug">🫂</button>
+        <button class="reaction-opt" data-reaction="cry" title="Emotional">😢</button>
+        <button class="reaction-opt" data-reaction="fire" title="Hot">🔥</button>
+    </div>
+
+    <!-- ============ CAPSULE CREATE MODAL ============ -->
+    <div id="capsuleCreateModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-gift" style="color:var(--primary);margin-right:6px"></i> Time Capsule</h2>
+                <button class="modal-close" onclick="closeCapsuleCreateModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:0 20px">
+                <p class="capsule-hint">Write a message for your future selves. It stays sealed until the date you choose.</p>
+                <textarea id="capsuleText" placeholder="Dear future us..." class="post-textarea" rows="4"></textarea>
+                <div id="capsuleImagePreview" class="image-preview" style="display:none">
+                    <img id="capsulePreviewImg" src="" alt="Preview">
+                    <button class="remove-image" onclick="removeCapsuleImage()"><i class="fas fa-times-circle"></i></button>
+                </div>
+                <div class="post-attach-bar">
+                    <label class="attach-btn" for="capsuleImageInput">
+                        <i class="fas fa-image"></i>
+                        <span>Photo</span>
+                    </label>
+                    <input type="file" id="capsuleImageInput" accept="image/*" style="display:none">
+                </div>
+                <div class="input-group" style="margin-top:12px">
+                    <i class="fas fa-calendar input-icon"></i>
+                    <input type="date" id="capsuleOpenDate" class="input-field" style="padding-left:44px" min="">
+                </div>
+            </div>
+            <button class="btn-primary btn-post" id="createCapsuleBtn" onclick="createCapsule()">
+                <i class="fas fa-lock"></i> Seal Capsule
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ CAPSULE VIEW MODAL ============ -->
+    <div id="capsuleViewModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-gift" style="color:var(--primary);margin-right:6px"></i> Time Capsule</h2>
+                <button class="modal-close" onclick="closeCapsuleViewModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="capsuleViewContent" style="padding:0 20px 20px"></div>
+        </div>
+    </div>
+
+    <!-- ============ COUNTDOWN CREATE MODAL ============ -->
+    <div id="countdownModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet" style="max-height:55vh">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-hourglass-half" style="color:var(--primary);margin-right:6px"></i> Countdown</h2>
+                <button class="modal-close" onclick="closeCountdownModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:0 20px">
+                <div class="input-group">
+                    <i class="fas fa-pen input-icon"></i>
+                    <input type="text" id="countdownName" placeholder="What are you counting down to?" class="input-field" maxlength="60">
+                </div>
+                <div class="input-group">
+                    <i class="fas fa-calendar input-icon"></i>
+                    <input type="date" id="countdownDate" class="input-field" style="padding-left:44px" min="">
+                </div>
+                <div class="emoji-select-row">
+                    <label>Emoji:</label>
+                    <button class="emoji-pick active" data-emoji="✈️">✈️</button>
+                    <button class="emoji-pick" data-emoji="🎂">🎂</button>
+                    <button class="emoji-pick" data-emoji="💍">💍</button>
+                    <button class="emoji-pick" data-emoji="🏠">🏠</button>
+                    <button class="emoji-pick" data-emoji="🌅">🌅</button>
+                    <button class="emoji-pick" data-emoji="🎉">🎉</button>
+                    <button class="emoji-pick" data-emoji="❤️">❤️</button>
+                </div>
+            </div>
+            <button class="btn-primary btn-post" onclick="createCountdown()">
+                <i class="fas fa-hourglass-start"></i> Start Countdown
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ MOOD SETTER MODAL ============ -->
+    <div id="moodModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet" style="max-height:60vh">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-face-smile" style="color:var(--primary);margin-right:6px"></i> How are you feeling?</h2>
+                <button class="modal-close" onclick="closeMoodModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="mood-options">
+                <button class="mood-opt" data-mood="loved" data-emoji="🥰"><span class="mood-emoji">🥰</span><span class="mood-label">Feeling loved</span></button>
+                <button class="mood-opt" data-mood="missing" data-emoji="💕"><span class="mood-emoji">💕</span><span class="mood-label">Missing you</span></button>
+                <button class="mood-opt" data-mood="thinking" data-emoji="💭"><span class="mood-emoji">💭</span><span class="mood-label">Thinking of you</span></button>
+                <button class="mood-opt" data-mood="excited" data-emoji="😍"><span class="mood-emoji">😍</span><span class="mood-label">Can't wait!</span></button>
+                <button class="mood-opt" data-mood="happy" data-emoji="😊"><span class="mood-emoji">😊</span><span class="mood-label">Happy</span></button>
+                <button class="mood-opt" data-mood="sad" data-emoji="😢"><span class="mood-emoji">😢</span><span class="mood-label">Missing you badly</span></button>
+                <button class="mood-opt" data-mood="grateful" data-emoji="🙏"><span class="mood-emoji">🙏</span><span class="mood-label">Grateful for you</span></button>
+                <button class="mood-opt" data-mood="playful" data-emoji="😜"><span class="mood-emoji">😜</span><span class="mood-label">Feeling playful</span></button>
+            </div>
+            <div style="padding:0 20px 20px">
+                <input type="text" id="moodCustomText" placeholder="Add a custom message..." class="comment-input" maxlength="40" style="width:100%;border-radius:var(--radius-md)">
+            </div>
+            <button class="btn-primary btn-post" onclick="setMood()">
+                <i class="fas fa-check"></i> Set Mood
+            </button>
+        </div>
+    </div>
+
+    <!-- ============ DAILY NOTE MODAL ============ -->
+    <div id="dailyNoteModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-feather-pointed" style="color:var(--primary);margin-right:6px"></i> Daily Love Note</h2>
+                <button class="modal-close" onclick="closeDailyNoteModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:0 20px">
+                <div class="daily-note-modal-prompt" id="dailyNoteModalPrompt"></div>
+                <textarea id="dailyNoteInput" placeholder="Write your heart out..." class="post-textarea" rows="3"></textarea>
+                <div id="dailyNotePartnerResponse" class="daily-note-partner" style="display:none">
+                    <div class="daily-note-partner-label" id="dailyNotePartnerLabel">P wrote:</div>
+                    <div class="daily-note-partner-text" id="dailyNotePartnerText"></div>
+                </div>
+            </div>
+            <button class="btn-primary btn-post" id="sendDailyNoteBtn" onclick="submitDailyNote()">
+                <i class="fas fa-paper-plane"></i> Send Note
+            </button>
         </div>
     </div>
 
