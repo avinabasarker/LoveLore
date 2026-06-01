@@ -25,6 +25,7 @@ let pendingImageData = null;  // Base64 image waiting to be posted
 let selectedUser = null;      // Temp: user selected on login screen
 let lastTapTime = 0;          // Double-tap detection
 let lastTapPostId = null;     // Double-tap target
+let allPostsCache = [];       // Cache of all posts for gallery
 
 // ---- Constants ----
 const USERS = ['A', 'P'];
@@ -291,6 +292,7 @@ function handleLogout() {
     commentsUnsubscribe = null;
     currentUser = null;
     selectedUser = null;
+    allPostsCache = [];
     localStorage.removeItem(SESSION_KEY);
 
     document.getElementById('mainApp').style.display = 'none';
@@ -355,7 +357,9 @@ function attachPostsListener() {
             snapshot.forEach(doc => {
                 posts.push({ id: doc.id, ...doc.data() });
             });
+            allPostsCache = posts;
             renderFeed(posts);
+            renderGallery(posts);
             document.getElementById('feedLoader').style.display = 'none';
             updateSyncDot('synced');
         }, error => {
@@ -553,13 +557,21 @@ function closeCommentsModal() {
 function loadComments(postId) {
     if (commentsUnsubscribe) commentsUnsubscribe();
 
+    // NOTE: We do NOT use .orderBy() here because that would require
+    // a Firestore composite index on (postId, createdAt) which needs
+    // manual setup in Firebase Console. Instead, we sort client-side.
     commentsUnsubscribe = fdb.collection(COMMENTS_COLLECTION)
         .where('postId', '==', postId)
-        .orderBy('createdAt', 'asc')
         .onSnapshot(snapshot => {
             const comments = [];
             snapshot.forEach(doc => {
                 comments.push({ id: doc.id, ...doc.data() });
+            });
+            // Sort client-side by createdAt ascending
+            comments.sort((a, b) => {
+                const timeA = a.createdAt ? (a.createdAt.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()) : 0;
+                const timeB = b.createdAt ? (b.createdAt.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()) : 0;
+                return timeA - timeB;
             });
             renderComments(comments);
         }, error => {
@@ -750,6 +762,46 @@ function closeImageViewer() {
     document.getElementById('imageViewer').style.display = 'none';
 }
 
+// ============ GALLERY ============
+
+function renderGallery(posts) {
+    const grid = document.getElementById('galleryGrid');
+    const emptyEl = document.getElementById('galleryEmpty');
+
+    if (!grid) return;
+
+    // Extract all posts that have images, newest first
+    const imagePosts = posts.filter(p => p.imageData);
+
+    if (imagePosts.length === 0) {
+        grid.innerHTML = '';
+        grid.style.display = 'none';
+        if (emptyEl) {
+            emptyEl.classList.add('show');
+        }
+        return;
+    }
+
+    if (emptyEl) emptyEl.classList.remove('show');
+    grid.style.display = 'grid';
+
+    grid.innerHTML = imagePosts.map(p => {
+        const lower = (p.author || 'a').toLowerCase();
+        return `
+            <div class="gallery-item" data-image="${p.imageData}">
+                <img src="${p.imageData}" alt="Photo by ${p.author}" loading="lazy">
+                <div class="gallery-author-dot user-${lower}">${p.author || '?'}</div>
+            </div>`;
+    }).join('');
+
+    // Click to view image fullscreen
+    grid.querySelectorAll('.gallery-item').forEach(item => {
+        item.addEventListener('click', () => {
+            openImageViewer(item.dataset.image);
+        });
+    });
+}
+
 // ============ PROFILE ============
 
 function renderProfile() {
@@ -846,7 +898,7 @@ function loadAnniversary() {
         if (doc.exists && doc.data().date) {
             renderAnniversary(doc.data().date);
         } else {
-            // No anniversary set yet — show setup prompt in profile
+            // No anniversary set yet
             document.getElementById('anniversaryBanner').style.display = 'none';
         }
     });
