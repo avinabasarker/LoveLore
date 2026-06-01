@@ -623,6 +623,27 @@ function renderFeed(posts) {
     container.querySelectorAll('.post-comment-preview').forEach(el => {
         el.addEventListener('click', () => openCommentsModal(el.dataset.postId));
     });
+    // Delete buttons
+    container.querySelectorAll('.post-delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const confirmBar = container.querySelector(`.post-delete-confirm[data-post-id="${btn.dataset.postId}"]`);
+            if (confirmBar) confirmBar.style.display = 'flex';
+        });
+    });
+    container.querySelectorAll('.confirm-del-yes').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            deletePost(btn.dataset.postId);
+        });
+    });
+    container.querySelectorAll('.confirm-del-no').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const confirmBar = container.querySelector(`.post-delete-confirm[data-post-id="${btn.dataset.postId}"]`);
+            if (confirmBar) confirmBar.style.display = 'none';
+        });
+    });
 }
 
 function renderPostCard(post) {
@@ -666,6 +687,10 @@ function renderPostCard(post) {
     const reactEmoji = myReaction ? (REACTION_TYPES[myReaction]?.emoji || '❤️') : '';
     const reactIcon = myReaction ? reactEmoji : '<i class="far fa-heart"></i>';
 
+    const deleteBtn = post.author === currentUser
+        ? `<button class="post-delete-btn" data-post-id="${post.id}" title="Delete post"><i class="fas fa-trash-alt"></i></button>`
+        : '';
+
     return `
         <div class="post-card" data-post-id="${post.id}">
             <div class="post-header">
@@ -674,6 +699,7 @@ function renderPostCard(post) {
                     <div class="post-author">${escapeHtml(post.author || 'Unknown')}</div>
                     <div class="post-time">${timeStr}</div>
                 </div>
+                ${deleteBtn}
             </div>
             ${imageHtml}
             ${textHtml}
@@ -683,6 +709,11 @@ function renderPostCard(post) {
             </div>
             ${reactionSummaryHtml}
             ${commentPreview}
+            <div class="post-delete-confirm" data-post-id="${post.id}" style="display:none">
+                <span>Delete this post?</span>
+                <button class="confirm-del-yes" data-post-id="${post.id}">Delete</button>
+                <button class="confirm-del-no" data-post-id="${post.id}">Cancel</button>
+            </div>
         </div>`;
 }
 
@@ -874,6 +905,25 @@ async function createPost() {
         console.error('Create post failed:', e);
         showToast('Failed to post. Try again.');
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Post';
+    }
+}
+
+// ============ DELETE POST ============
+
+async function deletePost(postId) {
+    try {
+        // Delete all comments for this post first
+        const commentsSnapshot = await fdb.collection(COMMENTS_COLLECTION)
+            .where('postId', '==', postId).get();
+        const batch = fdb.batch();
+        commentsSnapshot.forEach(doc => batch.delete(doc.ref));
+        // Delete the post itself
+        batch.delete(fdb.collection(POSTS_COLLECTION).doc(postId));
+        await batch.commit();
+        showToast('Post deleted');
+    } catch (e) {
+        console.error('Delete post failed:', e);
+        showToast('Failed to delete post');
     }
 }
 
