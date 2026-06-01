@@ -137,7 +137,19 @@
             </div>
         </div>
 
-        <!-- Profile Screen — no inline style="display:none"! CSS handles it -->
+        <!-- Gallery Screen -->
+        <div id="galleryScreen" class="app-screen">
+            <div id="galleryContent" class="gallery-content">
+                <div id="galleryGrid" class="gallery-grid"></div>
+                <div id="galleryEmpty" class="gallery-empty">
+                    <div class="empty-icon"><i class="fas fa-images"></i></div>
+                    <p class="empty-title">No photos yet</p>
+                    <p class="empty-sub">Photos you post will appear here</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Screen -->
         <div id="profileScreen" class="app-screen">
             <div id="profileContent" class="profile-content">
                 <!-- Rendered by JS -->
@@ -154,6 +166,10 @@
             <button class="nav-btn active" data-screen="feedScreen">
                 <i class="fas fa-home"></i>
                 <span>Home</span>
+            </button>
+            <button class="nav-btn" data-screen="galleryScreen">
+                <i class="fas fa-images"></i>
+                <span>Gallery</span>
             </button>
             <button class="nav-btn" data-screen="profileScreen">
                 <i class="fas fa-user"></i>
