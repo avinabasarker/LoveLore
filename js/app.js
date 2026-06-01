@@ -132,6 +132,99 @@ let encryptionKey = null;
 let isEncryptionSetup = false;
 const _decryptCache = new Map();
 
+// ============ OFFLINE CACHE (IndexedDB) ============
+
+const OFFLINE_DB = 'lovelore_offline';
+const OFFLINE_STORE = 'cached_data';
+const QUEUE_STORE = 'write_queue';
+
+function openOfflineDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(OFFLINE_DB, 2);
+        req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(OFFLINE_STORE)) db.createObjectStore(OFFLINE_STORE);
+            if (!db.objectStoreNames.contains(QUEUE_STORE)) db.createObjectStore(QUEUE_STORE, { autoIncrement: true });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function cacheData(key, data) {
+    try {
+        const db = await openOfflineDB();
+        const tx = db.transaction(OFFLINE_STORE, 'readwrite');
+        tx.objectStore(OFFLINE_STORE).put(data, key);
+        await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+    } catch (e) { console.warn('Cache write failed:', e); }
+}
+
+async function getCachedData(key) {
+    try {
+        const db = await openOfflineDB();
+        const tx = db.transaction(OFFLINE_STORE, 'readonly');
+        return new Promise((resolve) => {
+            const req = tx.objectStore(OFFLINE_STORE).get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => resolve(null);
+        });
+    } catch (e) { return null; }
+}
+
+async function queueWrite(operation) {
+    try {
+        const db = await openOfflineDB();
+        const tx = db.transaction(QUEUE_STORE, 'readwrite');
+        tx.objectStore(QUEUE_STORE).add({ ...operation, queuedAt: Date.now() });
+        await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = rej; });
+        showOfflineBanner();
+    } catch (e) { console.error('Queue write failed:', e); }
+}
+
+async function flushWriteQueue() {
+    try {
+        const db = await openOfflineDB();
+        const tx = db.transaction(QUEUE_STORE, 'readonly');
+        const items = await new Promise((resolve) => {
+            const req = tx.objectStore(QUEUE_STORE).getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => resolve([]);
+        });
+        if (items.length === 0) return;
+        for (const item of items) {
+            try {
+                if (item.type === 'post') {
+                    await fdb.collection(POSTS_COLLECTION).add(item.data);
+                } else if (item.type === 'comment') {
+                    await fdb.collection(COMMENTS_COLLECTION).add(item.data);
+                    await fdb.collection(POSTS_COLLECTION).doc(item.data.postId).update({
+                        commentCount: firebase.firestore.FieldValue.increment(1)
+                    });
+                }
+            } catch (e) { console.error('Flush item failed:', e); }
+        }
+        // Clear the queue
+        const clearTx = db.transaction(QUEUE_STORE, 'readwrite');
+        clearTx.objectStore(QUEUE_STORE).clear();
+        await new Promise((res, rej) => { clearTx.oncomplete = res; clearTx.onerror = rej; });
+        hideOfflineBanner();
+        showToast('Synced offline changes!');
+    } catch (e) { console.error('Flush queue failed:', e); }
+}
+
+function isOnline() { return navigator.onLine; }
+
+function showOfflineBanner() {
+    const banner = document.getElementById('offlineBanner');
+    if (banner) banner.style.display = 'flex';
+}
+
+function hideOfflineBanner() {
+    const banner = document.getElementById('offlineBanner');
+    if (banner) banner.style.display = 'none';
+}
+
 // ============ ENCRYPTION MODULE ============
 
 async function deriveAESKey(secret) {
@@ -284,8 +377,8 @@ function setupEventListeners() {
     document.getElementById('createPostModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCreatePostModal(); });
     document.getElementById('commentsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCommentsModal(); });
     // Online/offline
-    window.addEventListener('online', () => updateSyncDot('synced'));
-    window.addEventListener('offline', () => updateSyncDot('offline'));
+    window.addEventListener('online', () => { updateSyncDot('synced'); flushWriteQueue(); });
+    window.addEventListener('offline', () => { updateSyncDot('offline'); showOfflineBanner(); });
     // Reaction picker - close on click outside
     document.addEventListener('click', e => {
         const picker = document.getElementById('reactionPicker');
@@ -546,6 +639,18 @@ function showMainApp() {
     document.getElementById('createPostUser').textContent = currentUser;
     document.getElementById('commentAvatar').className = `mini-avatar tiny ${avatarClass}`;
     document.getElementById('commentAvatar').textContent = currentUser;
+    // Show cached data immediately while waiting for Firebase
+    (async () => {
+        const cachedPosts = await getCachedData('posts');
+        if (cachedPosts && cachedPosts.length > 0) {
+            allPostsCache = cachedPosts;
+            renderFeed(cachedPosts);
+            renderGallery(cachedPosts);
+            renderTimeline(cachedPosts);
+        }
+        const cachedMoods = await getCachedData('moods');
+        if (cachedMoods) { allMoodsCache = cachedMoods; updateMoodUI(cachedMoods); }
+    })();
     attachPostsListener();
     attachMoodsListener();
     attachCapsulesListener();
@@ -553,6 +658,8 @@ function showMainApp() {
     loadAnniversary();
     loadDailyNote();
     renderProfile();
+    // Show offline banner if currently offline
+    if (!isOnline()) showOfflineBanner();
 }
 
 // ============ REAL-TIME POSTS ============
@@ -577,12 +684,24 @@ function attachPostsListener() {
             renderFeed(posts);
             renderGallery(posts);
             renderTimeline(posts);
+            // Cache for offline access
+            cacheData('posts', posts.map(p => ({ ...p, createdAt: p.createdAt ? (p.createdAt.toDate ? p.createdAt.toDate().toISOString() : p.createdAt) : null })));
             document.getElementById('feedLoader').style.display = 'none';
             updateSyncDot('synced');
-        }, error => {
+            hideOfflineBanner();
+        }, async error => {
             console.error('Posts listener error:', error);
+            // Try loading from offline cache
+            const cached = await getCachedData('posts');
+            if (cached && cached.length > 0) {
+                allPostsCache = cached;
+                renderFeed(cached);
+                renderGallery(cached);
+                renderTimeline(cached);
+                showOfflineBanner();
+            }
             document.getElementById('feedLoader').style.display = 'none';
-            updateSyncDot('error');
+            updateSyncDot(isOnline() ? 'error' : 'offline');
         });
 }
 
@@ -830,14 +949,20 @@ async function addComment() {
     try {
         input.value = ''; updateSendBtnState();
         const encText = isEncryptionSetup ? await encryptText(rawText) : rawText;
-        await fdb.collection(COMMENTS_COLLECTION).add({
+        const commentData = {
             postId: currentPostForComments, author: currentUser,
             text: encText, encrypted: isEncryptionSetup,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        await fdb.collection(POSTS_COLLECTION).doc(currentPostForComments).update({
-            commentCount: firebase.firestore.FieldValue.increment(1)
-        });
+        };
+        if (isOnline()) {
+            await fdb.collection(COMMENTS_COLLECTION).add(commentData);
+            await fdb.collection(POSTS_COLLECTION).doc(currentPostForComments).update({
+                commentCount: firebase.firestore.FieldValue.increment(1)
+            });
+        } else {
+            queueWrite({ type: 'comment', data: { ...commentData, createdAt: new Date().toISOString() } });
+            showToast('Comment saved offline');
+        }
     } catch (e) { console.error('Add comment failed:', e); showToast('Failed to post comment'); input.value = rawText; }
 }
 
@@ -894,13 +1019,27 @@ async function createPost() {
     try {
         const encText = (isEncryptionSetup && rawText) ? await encryptText(rawText) : (rawText || '');
         const encImage = (isEncryptionSetup && pendingImageData) ? await encryptText(pendingImageData) : (pendingImageData || null);
-        await fdb.collection(POSTS_COLLECTION).add({
+        const postData = {
             author: currentUser, text: encText, imageData: encImage,
             encrypted: isEncryptionSetup, reactions: {}, commentCount: 0,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        if (isOnline()) {
+            await fdb.collection(POSTS_COLLECTION).add(postData);
+        } else {
+            // Queue for later, show immediately
+            queueWrite({ type: 'post', data: { ...postData, createdAt: new Date().toISOString() } });
+            const tempPost = {
+                id: 'pending_' + Date.now(), author: currentUser,
+                text: rawText, imageData: pendingImageData,
+                reactions: {}, commentCount: 0,
+                createdAt: new Date()
+            };
+            allPostsCache.unshift(tempPost);
+            renderFeed(allPostsCache);
+        }
         closeCreatePostModal();
-        showToast('Posted!');
+        showToast(isOnline() ? 'Posted!' : 'Saved offline — will sync when online');
     } catch (e) {
         console.error('Create post failed:', e);
         showToast('Failed to post. Try again.');
@@ -1051,6 +1190,7 @@ function attachCapsulesListener() {
                 capsules.push({ id: doc.id, ...data });
             }
             renderCapsules(capsules);
+            cacheData('capsules', capsules);
         }, error => console.error('Capsules listener error:', error));
 }
 
@@ -1178,6 +1318,7 @@ function attachCountdownsListener() {
             const countdowns = [];
             snapshot.forEach(doc => countdowns.push({ id: doc.id, ...doc.data() }));
             renderCountdowns(countdowns);
+            cacheData('countdowns', countdowns);
         }, error => console.error('Countdowns listener error:', error));
 }
 
@@ -1254,6 +1395,7 @@ function attachMoodsListener() {
             snapshot.forEach(doc => { moods[doc.id] = doc.data(); });
             allMoodsCache = moods;
             updateMoodUI(moods);
+            cacheData('moods', moods);
         }, error => console.error('Moods listener error:', error));
 }
 
@@ -1503,13 +1645,23 @@ function loadProfileStats() {
 // ============ ANNIVERSARY COUNTER ============
 
 function loadAnniversary() {
-    fdb.collection(SETTINGS_COLLECTION).doc('anniversary').onSnapshot(doc => {
+    fdb.collection(SETTINGS_COLLECTION).doc('anniversary').onSnapshot(async doc => {
         if (doc.exists && doc.data().date) { renderAnniversary(doc.data().date); }
-        else { document.getElementById('anniversaryBanner').style.display = 'none'; }
+        else {
+            // Try offline cache
+            const cached = await getCachedData('anniversary');
+            if (cached) { renderAnniversary(cached); }
+            else { document.getElementById('anniversaryBanner').style.display = 'none'; }
+        }
+    }, async error => {
+        console.error('Anniversary listener error:', error);
+        const cached = await getCachedData('anniversary');
+        if (cached) { renderAnniversary(cached); }
     });
 }
 
 function renderAnniversary(dateStr) {
+    cacheData('anniversary', dateStr);
     const anniversary = new Date(dateStr);
     const now = new Date();
     const diffMs = now - anniversary;
@@ -1615,7 +1767,11 @@ function escapeHtml(text) {
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(e => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log('SW registered');
+            // Check for updates every 30 minutes
+            setInterval(() => reg.update(), 30 * 60 * 1000);
+        }).catch(e => {
             console.warn('SW registration failed:', e);
         });
     });
