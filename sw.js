@@ -1,5 +1,5 @@
 /* ============================================
-   LoveLore Social — Service Worker v5
+   LoveLore Social — Service Worker v3
    Offline-first with smart caching
    ============================================ */
 
@@ -64,20 +64,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // App shell files (CSS, JS, HTML) — stale-while-revalidate
-    // This ensures cached version loads fast BUT updates in background
+    // App shell files — cache-first (instant load)
     if (event.request.url.startsWith(self.location.origin) &&
         (url.pathname.endsWith('.html') ||
          url.pathname.endsWith('.css') ||
          url.pathname.endsWith('.js') ||
-         url.pathname.endsWith('.json'))) {
-        event.respondWith(staleWhileRevalidate(event.request));
-        return;
-    }
-
-    // Images — cache-first
-    if (event.request.url.startsWith(self.location.origin) &&
-        url.pathname.endsWith('.png')) {
+         url.pathname.endsWith('.json') ||
+         url.pathname.endsWith('.png'))) {
         event.respondWith(cacheFirst(event.request));
         return;
     }
@@ -104,6 +97,7 @@ async function cacheFirst(request) {
         }
         return response;
     } catch (e) {
+        // If it's a navigation request, serve index.html
         if (request.mode === 'navigate') {
             return caches.match('./index.html');
         }
