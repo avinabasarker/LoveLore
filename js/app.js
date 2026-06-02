@@ -472,8 +472,12 @@ function setupEventListeners() {
     document.getElementById('voiceRecCancel').addEventListener('click', () => stopVoiceRecording(false));
     document.getElementById('voiceRecSend').addEventListener('click', () => stopVoiceRecording(true));
     // Context menu
-    document.getElementById('ctxReplyBtn').addEventListener('click', () => { if (selectedChatMsgId) replyToMessage(selectedChatMsgId); });
-    document.getElementById('ctxReactBtn').addEventListener('click', () => {
+    document.getElementById('ctxReplyBtn').addEventListener('click', e => {
+        e.stopPropagation();
+        if (selectedChatMsgId) replyToMessage(selectedChatMsgId);
+    });
+    document.getElementById('ctxReactBtn').addEventListener('click', e => {
+        e.stopPropagation();
         document.getElementById('chatContextMenu').style.display = 'none';
         const picker = document.getElementById('chatReactionPicker');
         picker.style.display = 'flex';
@@ -482,10 +486,14 @@ function setupEventListeners() {
         picker.style.bottom = '120px';
         picker.style.top = 'auto';
     });
-    document.getElementById('ctxDeleteBtn').addEventListener('click', () => { if (selectedChatMsgId) deleteChatMessage(selectedChatMsgId); });
+    document.getElementById('ctxDeleteBtn').addEventListener('click', e => {
+        e.stopPropagation();
+        if (selectedChatMsgId) deleteChatMessage(selectedChatMsgId);
+    });
     // Chat reaction picker clicks
     document.querySelectorAll('#chatReactionPicker .reaction-opt').forEach(opt => {
-        opt.addEventListener('click', () => {
+        opt.addEventListener('click', e => {
+            e.stopPropagation();
             if (selectedChatMsgId) addChatReaction(selectedChatMsgId, opt.dataset.reaction);
             document.getElementById('chatReactionPicker').style.display = 'none';
         });
@@ -500,12 +508,12 @@ function setupEventListeners() {
             document.getElementById('emojiPicker').style.display = 'none';
         });
     });
-    // Close menus on outside click
+    // Close menus on outside click - with delay to prevent race conditions
     document.addEventListener('click', e => {
         const ctxMenu = document.getElementById('chatContextMenu');
         if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target) && !e.target.closest('.chat-msg')) ctxMenu.style.display = 'none';
         const chatReactPicker = document.getElementById('chatReactionPicker');
-        if (chatReactPicker.style.display !== 'none' && !chatReactPicker.contains(e.target) && !e.target.closest('#ctxReactBtn')) chatReactPicker.style.display = 'none';
+        if (chatReactPicker.style.display !== 'none' && !chatReactPicker.contains(e.target) && !e.target.closest('#ctxReactBtn') && !e.target.closest('.reaction-opt')) chatReactPicker.style.display = 'none';
         const emojiPicker = document.getElementById('emojiPicker');
         if (emojiPicker.style.display !== 'none' && !emojiPicker.contains(e.target) && !e.target.closest('#chatEmojiBtn')) emojiPicker.style.display = 'none';
     });
@@ -2139,34 +2147,54 @@ function bindChatMessageEvents() {
     container.querySelectorAll('.chat-msg').forEach(el => {
         const msgId = el.dataset.msgId;
         let timer = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
         const startPress = (e) => {
-            e.preventDefault();
+            // Store position for context menu positioning
+            if (e.touches && e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            } else {
+                touchStartX = e.clientX;
+                touchStartY = e.clientY;
+            }
             timer = setTimeout(() => {
                 selectedChatMsgId = msgId;
-                showChatContextMenu(e, msgId);
+                showChatContextMenuAt(touchStartX, touchStartY, msgId);
             }, 500);
         };
         const endPress = () => { clearTimeout(timer); };
-        el.addEventListener('touchstart', startPress, { passive: false });
+        const movePress = (e) => {
+            // Cancel long-press if finger moves too much (allows scrolling)
+            if (e.touches && e.touches.length > 0) {
+                const dx = Math.abs(e.touches[0].clientX - touchStartX);
+                const dy = Math.abs(e.touches[0].clientY - touchStartY);
+                if (dx > 10 || dy > 10) clearTimeout(timer);
+            }
+        };
+        // Touch events - DO NOT call preventDefault on touchstart (that blocks scrolling!)
+        el.addEventListener('touchstart', startPress, { passive: true });
         el.addEventListener('touchend', endPress);
-        el.addEventListener('touchmove', endPress);
+        el.addEventListener('touchmove', movePress, { passive: true });
+        // Mouse events for desktop
         el.addEventListener('mousedown', startPress);
         el.addEventListener('mouseup', endPress);
         el.addEventListener('mouseleave', endPress);
+        // Right-click context menu for desktop
+        el.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            selectedChatMsgId = msgId;
+            showChatContextMenuAt(e.clientX, e.clientY, msgId);
+        });
     });
 }
 
-function showChatContextMenu(e, msgId) {
+function showChatContextMenuAt(x, y, msgId) {
     const menu = document.getElementById('chatContextMenu');
     const msg = allChatMessages.find(m => m.id === msgId);
     if (!msg) return;
 
-    // Position
-    let x, y;
-    if (e.touches) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
-    else { x = e.clientX; y = e.clientY; }
-
-    menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
+    menu.style.left = Math.min(x, window.innerWidth - 170) + 'px';
     menu.style.top = Math.max(60, y - 120) + 'px';
     menu.style.display = 'block';
 
@@ -2359,10 +2387,18 @@ async function markMessagesAsRead() {
 async function addChatReaction(msgId, reactionType) {
     try {
         const userKey = currentUser.toLowerCase();
-        await fdb.collection(MESSAGES_COLLECTION).doc(msgId).update({
-            [`reactions.${userKey}`]: reactionType
-        });
-    } catch (e) { console.error('Chat reaction failed:', e); }
+        const docRef = fdb.collection(MESSAGES_COLLECTION).doc(msgId);
+        const doc = await docRef.get();
+        if (!doc.exists) { console.error('Message not found for reaction'); return; }
+        const currentReactions = doc.data().reactions || {};
+        // Toggle: if same reaction exists, remove it; otherwise set it
+        if (currentReactions[userKey] === reactionType) {
+            delete currentReactions[userKey];
+        } else {
+            currentReactions[userKey] = reactionType;
+        }
+        await docRef.update({ reactions: currentReactions });
+    } catch (e) { console.error('Chat reaction failed:', e); showToast('Reaction failed'); }
 }
 
 // ---- Reply ----
