@@ -509,6 +509,8 @@ function setupEventListeners() {
         const emojiPicker = document.getElementById('emojiPicker');
         if (emojiPicker.style.display !== 'none' && !emojiPicker.contains(e.target) && !e.target.closest('#chatEmojiBtn')) emojiPicker.style.display = 'none';
     });
+    // Chat back button
+    document.getElementById('chatBackBtn').addEventListener('click', () => switchScreen('feedScreen'));
     // Letters
     document.getElementById('addLetterBtn').addEventListener('click', openLetterCreateModal);
     document.getElementById('closeLetterCreate').addEventListener('click', closeLetterCreateModal);
@@ -1423,9 +1425,15 @@ function attachCountdownsListener() {
     if (countdownsUnsubscribe) countdownsUnsubscribe();
     countdownsUnsubscribe = fdb.collection(COUNTDOWNS_COLLECTION)
         .orderBy('targetDate', 'asc')
-        .onSnapshot(snapshot => {
+        .onSnapshot(async snapshot => {
             const countdowns = [];
-            snapshot.forEach(doc => countdowns.push({ id: doc.id, ...doc.data() }));
+            for (const doc of snapshot.docs) {
+                const data = doc.data();
+                if (isEncryptionSetup) {
+                    if (data.name) data.name = await decryptField(data.name, doc.id, 'name');
+                }
+                countdowns.push({ id: doc.id, ...data });
+            }
             renderCountdowns(countdowns);
             cacheData('countdowns', countdowns);
         }, error => console.error('Countdowns listener error:', error));
@@ -1481,7 +1489,8 @@ async function createCountdown() {
     const emoji = activeEmoji ? activeEmoji.dataset.emoji : '📅';
     try {
         await fdb.collection(COUNTDOWNS_COLLECTION).add({
-            author: currentUser, name, targetDate, emoji,
+            author: currentUser, name: isEncryptionSetup ? await encryptText(name) : name, targetDate, emoji,
+            encrypted: isEncryptionSetup,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         closeCountdownModal();
@@ -1499,9 +1508,16 @@ async function deleteCountdown(id) {
 function attachMoodsListener() {
     if (moodsUnsubscribe) moodsUnsubscribe();
     moodsUnsubscribe = fdb.collection(MOODS_COLLECTION)
-        .onSnapshot(snapshot => {
+        .onSnapshot(async snapshot => {
             const moods = {};
-            snapshot.forEach(doc => { moods[doc.id] = doc.data(); });
+            for (const doc of snapshot.docs) {
+                const data = doc.data();
+                if (isEncryptionSetup) {
+                    if (data.mood) data.mood = await decryptField(data.mood, doc.id, 'mood');
+                    if (data.customText) data.customText = await decryptField(data.customText, doc.id, 'customText');
+                }
+                moods[doc.id] = data;
+            }
             allMoodsCache = moods;
             updateMoodUI(moods);
             cacheData('moods', moods);
@@ -1552,13 +1568,17 @@ async function setMood() {
     if (!selectedMood) { showToast('Pick a mood'); return; }
     const customText = document.getElementById('moodCustomText').value.trim();
     try {
+        const encMood = isEncryptionSetup ? await encryptText(selectedMood) : selectedMood;
+        const encCustomText = (isEncryptionSetup && customText) ? await encryptText(customText) : (customText || '');
         await fdb.collection(MOODS_COLLECTION).doc(currentUser.toLowerCase()).set({
-            user: currentUser, mood: selectedMood, customText: customText,
+            user: currentUser, mood: encMood, customText: encCustomText,
+            encrypted: isEncryptionSetup,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         // Also save to mood history for tracker
         await fdb.collection(MOOD_HISTORY_COLLECTION).add({
-            user: currentUser, mood: selectedMood, customText: customText,
+            user: currentUser, mood: encMood, customText: encCustomText,
+            encrypted: isEncryptionSetup,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         closeMoodModal();
@@ -1834,15 +1854,21 @@ function switchScreen(screenId) {
     document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`.nav-btn[data-screen="${screenId}"]`).classList.add('active');
+    const navBtn = document.querySelector(`.nav-btn[data-screen="${screenId}"]`);
+    if (navBtn) navBtn.classList.add('active');
     document.getElementById('fabCreate').style.display = screenId === 'feedScreen' ? 'flex' : 'none';
     const topBar = document.querySelector('.top-bar');
+    const bottomNav = document.querySelector('.bottom-nav');
     const offlineBanner = document.getElementById('offlineBanner');
     if (screenId === 'chatScreen') {
         if (topBar) topBar.style.display = 'none';
+        if (bottomNav) bottomNav.classList.add('chat-hidden');
         if (offlineBanner) offlineBanner.style.display = 'none';
+        // Mark chat messages as read when entering chat
+        setTimeout(() => markMessagesAsRead(), 500);
     } else {
         if (topBar) topBar.style.display = 'flex';
+        if (bottomNav) bottomNav.classList.remove('chat-hidden');
     }
 }
 
@@ -2419,7 +2445,6 @@ function updateChatSendBtn() {
     if (!input || !sendBtn) return;
     const hasText = input.value.trim().length > 0;
     sendBtn.disabled = !hasText;
-    sendBtn.style.display = hasText ? 'flex' : 'none';
     if (voiceBtn) voiceBtn.style.display = hasText ? 'none' : 'flex';
 }
 
@@ -2569,9 +2594,16 @@ function loadMoodHistory() {
     moodHistoryUnsubscribe = fdb.collection(MOOD_HISTORY_COLLECTION)
         .orderBy('createdAt', 'desc')
         .limit(30)
-        .onSnapshot(snapshot => {
+        .onSnapshot(async snapshot => {
             allMoodHistoryCache = [];
-            snapshot.forEach(doc => allMoodHistoryCache.push({ id: doc.id, ...doc.data() }));
+            for (const doc of snapshot.docs) {
+                const data = doc.data();
+                if (isEncryptionSetup) {
+                    if (data.mood) data.mood = await decryptField(data.mood, doc.id, 'mood');
+                    if (data.customText) data.customText = await decryptField(data.customText, doc.id, 'customText');
+                }
+                allMoodHistoryCache.push({ id: doc.id, ...data });
+            }
             renderMoodTracker();
         }, error => console.error('Mood history error:', error));
 }
