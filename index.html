@@ -151,6 +151,116 @@
             </div>
         </div>
 
+        <!-- Chat Screen -->
+        <div id="chatScreen" class="app-screen chat-screen">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="chat-header-left">
+                    <div id="chatPartnerAvatar" class="chat-partner-avatar">P</div>
+                    <div class="chat-header-info">
+                        <div id="chatPartnerName" class="chat-partner-name">Partner</div>
+                        <div id="chatPartnerStatus" class="chat-partner-status">offline</div>
+                    </div>
+                </div>
+                <div class="chat-header-right">
+                    <button class="chat-header-btn" id="chatSearchBtn" title="Search"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+
+            <!-- Messages Area -->
+            <div id="chatMessages" class="chat-messages">
+                <div id="chatEmpty" class="chat-empty">
+                    <div class="chat-empty-icon"><i class="fas fa-comments"></i></div>
+                    <p class="chat-empty-title">Start chatting</p>
+                    <p class="chat-empty-sub">Say something sweet to your partner</p>
+                </div>
+            </div>
+
+            <!-- New Messages Button -->
+            <button id="chatNewMsgBtn" class="chat-new-msg-btn" style="display:none"><i class="fas fa-arrow-down"></i> New messages</button>
+
+            <!-- Reply Preview -->
+            <div id="chatReplyPreview" class="chat-reply-preview" style="display:none">
+                <div class="chat-reply-preview-content">
+                    <div class="chat-reply-preview-author" id="chatReplyAuthor">P</div>
+                    <div class="chat-reply-preview-text" id="chatReplyText">Message preview...</div>
+                </div>
+                <button class="chat-reply-cancel" id="chatReplyCancel"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Chat Input Bar -->
+            <div class="chat-input-bar" id="chatInputBar">
+                <button class="chat-input-btn" id="chatEmojiBtn" title="Emoji"><i class="fas fa-face-smile"></i></button>
+                <button class="chat-input-btn" id="chatAttachBtn" title="Photo"><i class="fas fa-image"></i></button>
+                <input type="file" id="chatImageInput" accept="image/*" style="display:none">
+                <input type="text" id="chatInput" placeholder="Message..." class="chat-input" maxlength="2000" autocomplete="off">
+                <button class="chat-send-btn" id="chatSendBtn" disabled><i class="fas fa-paper-plane"></i></button>
+                <button class="chat-voice-btn" id="chatVoiceBtn" title="Voice message"><i class="fas fa-microphone"></i></button>
+            </div>
+
+            <!-- Voice Recording Overlay -->
+            <div id="chatVoiceOverlay" class="chat-voice-overlay" style="display:none">
+                <div class="voice-rec-indicator">
+                    <div class="voice-rec-dot"></div>
+                    <span class="voice-rec-time" id="voiceRecTime">0:00</span>
+                </div>
+                <div class="voice-rec-actions">
+                    <button class="voice-rec-cancel" id="voiceRecCancel"><i class="fas fa-trash"></i></button>
+                    <button class="voice-rec-send" id="voiceRecSend"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Love Letters Screen -->
+        <div id="lettersScreen" class="app-screen">
+            <div class="letters-content">
+                <div class="letters-section-header">
+                    <h3><i class="fas fa-envelope-open-text"></i> Love Letters</h3>
+                    <button class="capsules-add-btn" id="addLetterBtn"><i class="fas fa-plus"></i></button>
+                </div>
+                <div id="lettersList" class="letters-list"><div id="lettersEmpty" class="capsules-empty-sm">No letters yet. Write your first love letter!</div></div>
+            </div>
+        </div>
+
+        <!-- Mood Tracker Screen -->
+        <div id="moodTrackerScreen" class="app-screen">
+            <div class="mood-tracker-content">
+                <div class="mood-tracker-header">
+                    <h3><i class="fas fa-chart-line"></i> Mood Tracker</h3>
+                </div>
+                <div id="moodTrackerCombo" class="mood-tracker-combo">
+                    <div class="mood-tracker-empty" id="moodTrackerEmpty">
+                        <div class="empty-icon"><i class="fas fa-chart-line"></i></div>
+                        <p class="empty-title">No mood data yet</p>
+                        <p class="empty-sub">Set your moods to see the combo chart</p>
+                    </div>
+                    <canvas id="moodChartCanvas" style="display:none"></canvas>
+                </div>
+                <div class="mood-tracker-legend">
+                    <div class="mood-legend-item"><span class="mood-legend-dot user-a"></span> A</div>
+                    <div class="mood-legend-item"><span class="mood-legend-dot user-p"></span> P</div>
+                </div>
+                <div id="moodHistoryList" class="mood-history-list"></div>
+            </div>
+        </div>
+
+        <!-- Streak Screen -->
+        <div id="streakScreen" class="app-screen">
+            <div class="streak-content">
+                <div class="streak-main">
+                    <div class="streak-flame"><i class="fas fa-fire"></i></div>
+                    <div class="streak-number" id="streakNumber">0</div>
+                    <div class="streak-label">day streak</div>
+                    <div class="streak-sublabel" id="streakSublabel">Post daily to keep the streak alive!</div>
+                </div>
+                <div class="streak-calendar" id="streakCalendar"></div>
+                <div class="streak-best">
+                    <i class="fas fa-trophy"></i>
+                    <span>Best streak: <strong id="streakBest">0</strong> days</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Profile Screen -->
         <div id="profileScreen" class="app-screen"><div id="profileContent" class="profile-content"></div></div>
 
@@ -162,9 +272,11 @@
         </div>
         <nav class="bottom-nav">
             <button class="nav-btn active" data-screen="feedScreen"><i class="fas fa-home"></i><span>Home</span></button>
-            <button class="nav-btn" data-screen="timelineScreen"><i class="fas fa-clock-rotate-left"></i><span>Timeline</span></button>
+            <button class="nav-btn" data-screen="chatScreen"><i class="fas fa-comment"></i><span>Chat</span></button>
             <button class="nav-btn" data-screen="capsulesScreen"><i class="fas fa-gift"></i><span>Capsules</span></button>
-            <button class="nav-btn" data-screen="galleryScreen"><i class="fas fa-images"></i><span>Gallery</span></button>
+            <button class="nav-btn" data-screen="lettersScreen"><i class="fas fa-envelope"></i><span>Letters</span></button>
+            <button class="nav-btn" data-screen="moodTrackerScreen"><i class="fas fa-chart-line"></i><span>Moods</span></button>
+            <button class="nav-btn" data-screen="streakScreen"><i class="fas fa-fire"></i><span>Streak</span></button>
             <button class="nav-btn" data-screen="profileScreen"><i class="fas fa-user"></i><span>Me</span></button>
         </nav>
     </div>
@@ -206,6 +318,59 @@
         <button class="reaction-opt" data-reaction="hug">🫂</button>
         <button class="reaction-opt" data-reaction="cry">😢</button>
         <button class="reaction-opt" data-reaction="fire">🔥</button>
+    </div>
+
+    <!-- Chat Reaction Picker -->
+    <div id="chatReactionPicker" class="reaction-picker" style="display:none">
+        <button class="reaction-opt" data-reaction="heart">❤️</button>
+        <button class="reaction-opt" data-reaction="love">😍</button>
+        <button class="reaction-opt" data-reaction="kiss">💋</button>
+        <button class="reaction-opt" data-reaction="hug">🫂</button>
+        <button class="reaction-opt" data-reaction="cry">😢</button>
+        <button class="reaction-opt" data-reaction="fire">🔥</button>
+    </div>
+
+    <!-- Chat Context Menu -->
+    <div id="chatContextMenu" class="chat-context-menu" style="display:none">
+        <button class="ctx-menu-item" id="ctxReplyBtn"><i class="fas fa-reply"></i> Reply</button>
+        <button class="ctx-menu-item" id="ctxReactBtn"><i class="fas fa-face-smile"></i> React</button>
+        <button class="ctx-menu-item ctx-danger" id="ctxDeleteBtn"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+
+    <!-- Chat Search Overlay -->
+    <div id="chatSearchOverlay" class="chat-search-overlay" style="display:none">
+        <div class="chat-search-bar">
+            <button class="chat-search-back" id="chatSearchBack"><i class="fas fa-arrow-left"></i></button>
+            <input type="text" id="chatSearchInput" placeholder="Search messages..." class="chat-search-input" autocomplete="off">
+        </div>
+        <div id="chatSearchResults" class="chat-search-results"></div>
+    </div>
+
+    <!-- Emoji Picker -->
+    <div id="emojiPicker" class="emoji-picker" style="display:none">
+        <div class="emoji-picker-grid">
+            <button class="emoji-pick-btn" data-emoji="😀">😀</button><button class="emoji-pick-btn" data-emoji="😂">😂</button>
+            <button class="emoji-pick-btn" data-emoji="🥰">🥰</button><button class="emoji-pick-btn" data-emoji="😍">😍</button>
+            <button class="emoji-pick-btn" data-emoji="😘">😘</button><button class="emoji-pick-btn" data-emoji="🤗">🤗</button>
+            <button class="emoji-pick-btn" data-emoji="💕">💕</button><button class="emoji-pick-btn" data-emoji="❤️">❤️</button>
+            <button class="emoji-pick-btn" data-emoji="💔">💔</button><button class="emoji-pick-btn" data-emoji="💋">💋</button>
+            <button class="emoji-pick-btn" data-emoji="🫂">🫂</button><button class="emoji-pick-btn" data-emoji="🥺">🥺</button>
+            <button class="emoji-pick-btn" data-emoji="😢">😢</button><button class="emoji-pick-btn" data-emoji="😭">😭</button>
+            <button class="emoji-pick-btn" data-emoji="😤">😤</button><button class="emoji-pick-btn" data-emoji="🤯">🤯</button>
+            <button class="emoji-pick-btn" data-emoji="🥳">🥳</button><button class="emoji-pick-btn" data-emoji="😎">😎</button>
+            <button class="emoji-pick-btn" data-emoji="🤔">🤔</button><button class="emoji-pick-btn" data-emoji="😏">😏</button>
+            <button class="emoji-pick-btn" data-emoji="🤭">🤭</button><button class="emoji-pick-btn" data-emoji="😜">😜</button>
+            <button class="emoji-pick-btn" data-emoji="🤤">🤤</button><button class="emoji-pick-btn" data-emoji="😴">😴</button>
+            <button class="emoji-pick-btn" data-emoji="🫡">🫡</button><button class="emoji-pick-btn" data-emoji="👀">👀</button>
+            <button class="emoji-pick-btn" data-emoji="🔥">🔥</button><button class="emoji-pick-btn" data-emoji="✨">✨</button>
+            <button class="emoji-pick-btn" data-emoji="💯">💯</button><button class="emoji-pick-btn" data-emoji="🙏">🙏</button>
+            <button class="emoji-pick-btn" data-emoji="💪">💪</button><button class="emoji-pick-btn" data-emoji="👋">👋</button>
+            <button class="emoji-pick-btn" data-emoji="🤝">🤝</button><button class="emoji-pick-btn" data-emoji="👻">👻</button>
+            <button class="emoji-pick-btn" data-emoji="🎉">🎉</button><button class="emoji-pick-btn" data-emoji="🎂">🎂</button>
+            <button class="emoji-pick-btn" data-emoji="🌹">🌹</button><button class="emoji-pick-btn" data-emoji="🌸">🌸</button>
+            <button class="emoji-pick-btn" data-emoji="☀️">☀️</button><button class="emoji-pick-btn" data-emoji="🌙">🌙</button>
+            <button class="emoji-pick-btn" data-emoji="⭐">⭐</button><button class="emoji-pick-btn" data-emoji="💖">💖</button>
+        </div>
     </div>
 
     <!-- ============ CAPSULE CREATE MODAL ============ -->
@@ -290,6 +455,30 @@
                 </div>
             </div>
             <button id="sendDailyNoteBtn" class="btn-primary btn-post"><i class="fas fa-paper-plane"></i> Send Note</button>
+        </div>
+    </div>
+
+    <!-- Love Letter Create Modal -->
+    <div id="letterCreateModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header"><h2><i class="fas fa-envelope" style="color:var(--primary);margin-right:6px"></i> Love Letter</h2><button class="modal-close" id="closeLetterCreate"><i class="fas fa-times"></i></button></div>
+            <div style="padding:0 20px">
+                <p class="capsule-hint">Write a love letter. It stays sealed until your partner opens it.</p>
+                <textarea id="letterText" placeholder="My dearest..." class="post-textarea" rows="6"></textarea>
+                <div id="letterImagePreview" class="image-preview" style="display:none"><img id="letterPreviewImg" src="" alt="Preview"><button class="remove-image" id="removeLetterImage"><i class="fas fa-times-circle"></i></button></div>
+                <div class="post-attach-bar"><label class="attach-btn" for="letterImageInput"><i class="fas fa-image"></i><span>Photo</span></label><input type="file" id="letterImageInput" accept="image/*" style="display:none"></div>
+            </div>
+            <button id="createLetterBtn" class="btn-primary btn-post"><i class="fas fa-paper-plane"></i> Send Letter</button>
+        </div>
+    </div>
+
+    <!-- Love Letter View Modal -->
+    <div id="letterViewModal" class="modal-overlay" style="display:none">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-header"><h2><i class="fas fa-envelope-open" style="color:var(--primary);margin-right:6px"></i> Love Letter</h2><button class="modal-close" id="closeLetterView"><i class="fas fa-times"></i></button></div>
+            <div id="letterViewContent" style="padding:0 20px 20px"></div>
         </div>
     </div>
 
