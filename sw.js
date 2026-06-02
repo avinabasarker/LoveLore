@@ -1,10 +1,10 @@
 /* ============================================
-   LoveLore Social — Service Worker v3
+   LoveLore Social — Service Worker v5
    Offline-first with smart caching
    ============================================ */
 
-const CACHE_NAME = 'lovelore-v4';
-const RUNTIME_CACHE = 'lovelore-runtime-v4';
+const CACHE_NAME = 'lovelore-v5';
+const RUNTIME_CACHE = 'lovelore-runtime-v5';
 
 // Core app files to pre-cache on install
 const APP_SHELL = [
@@ -64,13 +64,20 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // App shell files — cache-first (instant load)
+    // App shell files (CSS, JS, HTML) — stale-while-revalidate
+    // This ensures cached version loads fast BUT updates in background
     if (event.request.url.startsWith(self.location.origin) &&
         (url.pathname.endsWith('.html') ||
          url.pathname.endsWith('.css') ||
          url.pathname.endsWith('.js') ||
-         url.pathname.endsWith('.json') ||
-         url.pathname.endsWith('.png'))) {
+         url.pathname.endsWith('.json'))) {
+        event.respondWith(staleWhileRevalidate(event.request));
+        return;
+    }
+
+    // Images — cache-first
+    if (event.request.url.startsWith(self.location.origin) &&
+        url.pathname.endsWith('.png')) {
         event.respondWith(cacheFirst(event.request));
         return;
     }
@@ -97,7 +104,6 @@ async function cacheFirst(request) {
         }
         return response;
     } catch (e) {
-        // If it's a navigation request, serve index.html
         if (request.mode === 'navigate') {
             return caches.match('./index.html');
         }
