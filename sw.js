@@ -1,10 +1,10 @@
 /* ============================================
-   LoveLore Social — Service Worker v2
+   LoveLore Social — Service Worker v3
    Offline-first with smart caching
    ============================================ */
 
-const CACHE_NAME = 'lovelore-v3';
-const RUNTIME_CACHE = 'lovelore-runtime-v3';
+const CACHE_NAME = 'lovelore-v4';
+const RUNTIME_CACHE = 'lovelore-runtime-v4';
 
 // Core app files to pre-cache on install
 const APP_SHELL = [
