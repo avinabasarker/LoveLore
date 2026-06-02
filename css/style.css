@@ -44,6 +44,7 @@ html, body {
     color: var(--text);
     -webkit-tap-highlight-color: transparent;
     -webkit-font-smoothing: antialiased;
+    touch-action: manipulation;
 }
 
 .screen {
@@ -260,7 +261,10 @@ html, body {
 .app-screen {
     position: fixed; top: 56px; left: 0; right: 0; bottom: 60px;
     overflow-y: auto; overflow-x: hidden;
-    -webkit-overflow-scrolling: touch; display: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
+    display: none;
 }
 .app-screen.active { display: block; }
 
@@ -911,6 +915,8 @@ html, body {
 .chat-messages {
     flex: 1; overflow-y: auto; padding: 12px 12px 8px;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    touch-action: pan-y;
 }
 .chat-empty {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
