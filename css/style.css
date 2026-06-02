@@ -504,6 +504,8 @@ html, body {
 }
 .capsules-add-btn:hover { background: var(--primary); color: white; }
 .capsules-empty-sm { text-align: center; padding: 24px 16px; color: var(--text-light); font-size: 13px; }
+.countdowns-list { display: flex; flex-direction: column; gap: 0; }
+.capsules-list { display: flex; flex-direction: column; gap: 0; }
 
 /* Countdown Card */
 .countdown-card {
