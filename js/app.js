@@ -228,6 +228,7 @@ async function flushWriteQueue() {
                 }
             } catch (e) { console.error('Flush item failed:', e); }
         }
+        // Clear the queue
         const clearTx = db.transaction(QUEUE_STORE, 'readwrite');
         clearTx.objectStore(QUEUE_STORE).clear();
         await new Promise((res, rej) => { clearTx.oncomplete = res; clearTx.onerror = rej; });
@@ -336,6 +337,7 @@ function checkSession() {
             const data = JSON.parse(session);
             if (data.username && USERS.includes(data.username)) {
                 currentUser = data.username;
+                // Try to restore encryption
                 const storedSecret = getStoredEncSecret();
                 if (storedSecret) {
                     deriveAESKey(storedSecret).then(key => {
@@ -355,40 +357,52 @@ function checkSession() {
 // ============ EVENT LISTENERS ============
 
 function setupEventListeners() {
+    // Avatar selection
     document.querySelectorAll('.avatar-btn').forEach(btn => {
         btn.addEventListener('click', () => handleAvatarSelect(btn.dataset.user));
     });
+    // Set password
     document.getElementById('setPasswordBtn').addEventListener('click', handleSetPassword);
     document.getElementById('confirmPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleSetPassword(); });
+    // Login
     document.getElementById('loginBtn').addEventListener('click', handleLogin);
     document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') handleLogin(); });
+    // Back button
     document.getElementById('backToAvatar').addEventListener('click', () => {
         document.getElementById('passwordSection').style.display = 'none';
         document.getElementById('avatarSection').style.display = 'block';
         clearAuthErrors();
     });
+    // Encryption setup
     document.getElementById('setSecretBtn').addEventListener('click', handleSetSecret);
     document.getElementById('unlockSecretBtn').addEventListener('click', handleUnlockSecret);
+    // FAB
     document.getElementById('fabCreate').addEventListener('click', openCreatePostModal);
+    // Create post
     document.getElementById('closeCreatePost').addEventListener('click', closeCreatePostModal);
     document.getElementById('postBtn').addEventListener('click', createPost);
     document.getElementById('postText').addEventListener('input', updatePostBtnState);
     document.getElementById('imageInput').addEventListener('change', handleImageSelect);
     document.getElementById('removeImage').addEventListener('click', removeSelectedImage);
+    // Comments
     document.getElementById('closeComments').addEventListener('click', closeCommentsModal);
     document.getElementById('sendComment').addEventListener('click', addComment);
     document.getElementById('commentInput').addEventListener('keydown', e => { if (e.key === 'Enter') addComment(); });
     document.getElementById('commentInput').addEventListener('input', updateSendBtnState);
+    // Image viewer
     document.getElementById('closeViewer').addEventListener('click', closeImageViewer);
+    // Navigation
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.addEventListener('click', () => switchScreen(btn.dataset.screen));
     });
+    // Logout
     document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    // Modal overlay clicks
     document.getElementById('createPostModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCreatePostModal(); });
     document.getElementById('commentsModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeCommentsModal(); });
+    // Online/offline
     window.addEventListener('online', () => { updateSyncDot('synced'); flushWriteQueue(); });
     window.addEventListener('offline', () => { updateSyncDot('offline'); showOfflineBanner(); });
-
     // Reaction picker - close on click outside
     document.addEventListener('click', e => {
         const picker = document.getElementById('reactionPicker');
@@ -396,25 +410,31 @@ function setupEventListeners() {
             picker.style.display = 'none';
         }
     });
-
+    // Capsule image
     document.getElementById('capsuleImageInput').addEventListener('change', handleCapsuleImageSelect);
+    // Emoji picks for countdown
     document.querySelectorAll('.emoji-pick').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.emoji-pick').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
         });
     });
-
+    // ---- NEW FEATURE BUTTON WIRING ----
     // Mood indicator in top bar
     document.getElementById('moodIndicatorTop').addEventListener('click', openMoodSetter);
+    // Capsules tab: add buttons
     document.getElementById('addCountdownBtn').addEventListener('click', openCountdownModal);
     document.getElementById('addCapsuleBtn').addEventListener('click', openCapsuleCreateModal);
+    // Capsule create modal: close + seal button + remove image
     document.getElementById('closeCapsuleCreate').addEventListener('click', closeCapsuleCreateModal);
     document.getElementById('createCapsuleBtn').addEventListener('click', createCapsule);
     document.getElementById('removeCapsuleImage').addEventListener('click', removeCapsuleImage);
+    // Capsule view modal: close
     document.getElementById('closeCapsuleView').addEventListener('click', closeCapsuleViewModal);
+    // Countdown modal: close + create button
     document.getElementById('closeCountdownModal').addEventListener('click', closeCountdownModal);
     document.getElementById('createCountdownBtn').addEventListener('click', createCountdown);
+    // Mood modal: close + set button + mood options
     document.getElementById('closeMoodModal').addEventListener('click', closeMoodModal);
     document.getElementById('setMoodBtn').addEventListener('click', setMood);
     document.querySelectorAll('.mood-opt').forEach(opt => {
@@ -424,13 +444,14 @@ function setupEventListeners() {
             selectedMood = opt.dataset.mood;
         });
     });
+    // Daily note modal: close + send + banner click
     document.getElementById('closeDailyNoteModal').addEventListener('click', closeDailyNoteModal);
     document.getElementById('sendDailyNoteBtn').addEventListener('click', submitDailyNote);
     document.getElementById('dailyNoteBanner').addEventListener('click', openDailyNoteModal);
+    // Close modals on overlay click
     ['capsuleCreateModal', 'capsuleViewModal', 'countdownModal', 'moodModal', 'dailyNoteModal'].forEach(id => {
         document.getElementById(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
     });
-
     // Chat event listeners
     document.getElementById('chatInput').addEventListener('input', () => { updateChatSendBtn(); handleChatTyping(); });
     document.getElementById('chatSendBtn').addEventListener('click', sendChatMessage);
@@ -447,28 +468,21 @@ function setupEventListeners() {
     document.getElementById('chatSearchInput').addEventListener('input', e => searchChatMessages(e.target.value));
     document.getElementById('chatNewMsgBtn').addEventListener('click', scrollChatToBottom);
     document.getElementById('chatReplyCancel').addEventListener('click', cancelReply);
+    // Voice recording
     document.getElementById('voiceRecCancel').addEventListener('click', () => stopVoiceRecording(false));
     document.getElementById('voiceRecSend').addEventListener('click', () => stopVoiceRecording(true));
-
-    // Context menu buttons
-    document.getElementById('ctxReplyBtn').addEventListener('click', () => {
-        if (selectedChatMsgId) replyToMessage(selectedChatMsgId);
-    });
+    // Context menu
+    document.getElementById('ctxReplyBtn').addEventListener('click', () => { if (selectedChatMsgId) replyToMessage(selectedChatMsgId); });
     document.getElementById('ctxReactBtn').addEventListener('click', () => {
         document.getElementById('chatContextMenu').style.display = 'none';
         const picker = document.getElementById('chatReactionPicker');
-        // Position the picker above the input bar
         picker.style.display = 'flex';
-        picker.style.position = 'fixed';
         picker.style.left = '50%';
         picker.style.transform = 'translateX(-50%)';
-        picker.style.bottom = '70px';
+        picker.style.bottom = '120px';
         picker.style.top = 'auto';
     });
-    document.getElementById('ctxDeleteBtn').addEventListener('click', () => {
-        if (selectedChatMsgId) deleteChatMessage(selectedChatMsgId);
-    });
-
+    document.getElementById('ctxDeleteBtn').addEventListener('click', () => { if (selectedChatMsgId) deleteChatMessage(selectedChatMsgId); });
     // Chat reaction picker clicks
     document.querySelectorAll('#chatReactionPicker .reaction-opt').forEach(opt => {
         opt.addEventListener('click', () => {
@@ -476,7 +490,6 @@ function setupEventListeners() {
             document.getElementById('chatReactionPicker').style.display = 'none';
         });
     });
-
     // Emoji picker clicks
     document.querySelectorAll('#emojiPicker .emoji-pick-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -487,19 +500,17 @@ function setupEventListeners() {
             document.getElementById('emojiPicker').style.display = 'none';
         });
     });
-
     // Close menus on outside click
     document.addEventListener('click', e => {
         const ctxMenu = document.getElementById('chatContextMenu');
-        if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) ctxMenu.style.display = 'none';
+        if (ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target) && !e.target.closest('.chat-msg')) ctxMenu.style.display = 'none';
         const chatReactPicker = document.getElementById('chatReactionPicker');
-        if (chatReactPicker.style.display !== 'none' && !chatReactPicker.contains(e.target)) chatReactPicker.style.display = 'none';
+        if (chatReactPicker.style.display !== 'none' && !chatReactPicker.contains(e.target) && !e.target.closest('#ctxReactBtn')) chatReactPicker.style.display = 'none';
         const emojiPicker = document.getElementById('emojiPicker');
         if (emojiPicker.style.display !== 'none' && !emojiPicker.contains(e.target) && !e.target.closest('#chatEmojiBtn')) emojiPicker.style.display = 'none';
     });
-
+    // Chat back button
     document.getElementById('chatBackBtn').addEventListener('click', () => switchScreen('feedScreen'));
-
     // Letters
     document.getElementById('addLetterBtn').addEventListener('click', openLetterCreateModal);
     document.getElementById('closeLetterCreate').addEventListener('click', closeLetterCreateModal);
@@ -507,18 +518,10 @@ function setupEventListeners() {
     document.getElementById('letterImageInput').addEventListener('change', handleLetterImageSelect);
     document.getElementById('removeLetterImage').addEventListener('click', removeLetterImage);
     document.getElementById('closeLetterView').addEventListener('click', closeLetterViewModal);
+    // Letter modals overlay click
     ['letterCreateModal', 'letterViewModal'].forEach(id => {
         document.getElementById(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
     });
-
-    // Dismiss chat context menu on scroll
-    const chatMessagesEl = document.getElementById('chatMessages');
-    if (chatMessagesEl) {
-        chatMessagesEl.addEventListener('scroll', () => {
-            document.getElementById('chatContextMenu').style.display = 'none';
-            document.getElementById('chatReactionPicker').style.display = 'none';
-        });
-    }
 }
 
 // ============ AUTH SYSTEM ============
@@ -526,14 +529,14 @@ function setupEventListeners() {
 async function handleAvatarSelect(user) {
     selectedUser = user;
     document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
-    document.querySelector('.avatar-btn[data-user="' + user + '"]').classList.add('selected');
+    document.querySelector(`.avatar-btn[data-user="${user}"]`).classList.add('selected');
     try {
         updateSyncDot('syncing');
         const doc = await fdb.collection(ACCOUNTS_COLLECTION).doc(user.toLowerCase()).get();
-        const avatarClass = 'user-' + user.toLowerCase();
-        document.getElementById('setPassAvatar').className = 'mini-avatar ' + avatarClass;
+        const avatarClass = `user-${user.toLowerCase()}`;
+        document.getElementById('setPassAvatar').className = `mini-avatar ${avatarClass}`;
         document.getElementById('setPassAvatar').textContent = user;
-        document.getElementById('loginAvatar').className = 'mini-avatar ' + avatarClass;
+        document.getElementById('loginAvatar').className = `mini-avatar ${avatarClass}`;
         document.getElementById('loginAvatar').textContent = user;
         document.getElementById('loginUserName').textContent = user;
         if (doc.exists && doc.data().passwordHash) {
@@ -589,6 +592,7 @@ async function handleLogin() {
         if (hash === doc.data().passwordHash) {
             currentUser = selectedUser;
             saveSession(currentUser);
+            // Update UID
             const uid = fAuth.currentUser ? fAuth.currentUser.uid : 'unknown';
             await fdb.collection(ACCOUNTS_COLLECTION).doc(selectedUser.toLowerCase()).set({ uid }, { merge: true });
             updateSyncDot('synced');
@@ -651,9 +655,11 @@ function clearAuthFields() { document.getElementById('newPassword').value = ''; 
 // ============ ENCRYPTION SETUP FLOW ============
 
 async function checkEncryptionAndProceed() {
+    // Check if shared secret exists in Firestore
     try {
         const doc = await fdb.collection(SETTINGS_COLLECTION).doc('encryption').get();
         if (doc.exists && doc.data().secretHash) {
+            // Secret exists - need to unlock
             const storedLocal = getStoredEncSecret();
             if (storedLocal) {
                 const verifyHash = await hashSecret(storedLocal);
@@ -664,11 +670,13 @@ async function checkEncryptionAndProceed() {
                     return;
                 }
             }
+            // Show unlock screen
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('encryptionScreen').style.display = 'flex';
             document.getElementById('setSecretForm').style.display = 'none';
             document.getElementById('unlockSecretForm').style.display = 'block';
         } else {
+            // No secret yet - show set screen
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('encryptionScreen').style.display = 'flex';
             document.getElementById('setSecretForm').style.display = 'block';
@@ -676,7 +684,7 @@ async function checkEncryptionAndProceed() {
         }
     } catch (e) {
         console.error('Encryption check failed:', e);
-        showMainApp();
+        showMainApp(); // Fallback to unencrypted
     }
 }
 
@@ -729,13 +737,13 @@ function showMainApp() {
     document.getElementById('encryptionScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'block';
     const lower = currentUser.toLowerCase();
-    const avatarClass = 'user-' + lower;
-    document.getElementById('createPostAvatar').className = 'mini-avatar ' + avatarClass;
+    const avatarClass = `user-${lower}`;
+    document.getElementById('createPostAvatar').className = `mini-avatar ${avatarClass}`;
     document.getElementById('createPostAvatar').textContent = currentUser;
     document.getElementById('createPostUser').textContent = currentUser;
-    document.getElementById('commentAvatar').className = 'mini-avatar tiny ' + avatarClass;
+    document.getElementById('commentAvatar').className = `mini-avatar tiny ${avatarClass}`;
     document.getElementById('commentAvatar').textContent = currentUser;
-    // Show cached data immediately
+    // Show cached data immediately while waiting for Firebase
     (async () => {
         const cachedPosts = await getCachedData('posts');
         if (cachedPosts && cachedPosts.length > 0) {
@@ -760,6 +768,7 @@ function showMainApp() {
     attachLettersListener();
     loadStreak();
     loadMoodHistory();
+    // Show offline banner if currently offline
     if (!isOnline()) showOfflineBanner();
 }
 
@@ -778,14 +787,6 @@ function attachPostsListener() {
                 if (isEncryptionSetup) {
                     data.text = await decryptField(data.text, doc.id, 'text');
                     if (data.imageData) data.imageData = await decryptField(data.imageData, doc.id, 'imageData');
-                    // Decrypt reaction types
-                    if (data.reactions) {
-                        const decReactions = {};
-                        for (const [k, v] of Object.entries(data.reactions)) {
-                            decReactions[k] = isEncryptionSetup && typeof v === 'string' && v.startsWith('ENC:') ? await decryptField(v, doc.id, 'react_' + k) : v;
-                        }
-                        data.reactions = decReactions;
-                    }
                 }
                 posts.push({ id: doc.id, ...data });
             }
@@ -793,12 +794,14 @@ function attachPostsListener() {
             renderFeed(posts);
             renderGallery(posts);
             renderTimeline(posts);
+            // Cache for offline access
             cacheData('posts', posts.map(p => ({ ...p, createdAt: p.createdAt ? (p.createdAt.toDate ? p.createdAt.toDate().toISOString() : p.createdAt) : null })));
             document.getElementById('feedLoader').style.display = 'none';
             updateSyncDot('synced');
             hideOfflineBanner();
         }, async error => {
             console.error('Posts listener error:', error);
+            // Try loading from offline cache
             const cached = await getCachedData('posts');
             if (cached && cached.length > 0) {
                 allPostsCache = cached;
@@ -820,6 +823,7 @@ function renderFeed(posts) {
     if (!posts || posts.length === 0) { container.innerHTML = ''; emptyState.classList.add('show'); return; }
     emptyState.classList.remove('show');
     container.innerHTML = posts.map(post => renderPostCard(post)).join('');
+    // Event listeners
     container.querySelectorAll('.react-btn').forEach(btn => {
         btn.addEventListener('click', e => { e.stopPropagation(); openReactionPicker(btn); });
     });
@@ -848,20 +852,24 @@ function renderFeed(posts) {
     container.querySelectorAll('.post-comment-preview').forEach(el => {
         el.addEventListener('click', () => openCommentsModal(el.dataset.postId));
     });
+    // Delete buttons
     container.querySelectorAll('.post-delete-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
-            const confirmBar = container.querySelector('.post-delete-confirm[data-post-id="' + btn.dataset.postId + '"]');
+            const confirmBar = container.querySelector(`.post-delete-confirm[data-post-id="${btn.dataset.postId}"]`);
             if (confirmBar) confirmBar.style.display = 'flex';
         });
     });
     container.querySelectorAll('.confirm-del-yes').forEach(btn => {
-        btn.addEventListener('click', e => { e.stopPropagation(); deletePost(btn.dataset.postId); });
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            deletePost(btn.dataset.postId);
+        });
     });
     container.querySelectorAll('.confirm-del-no').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
-            const confirmBar = container.querySelector('.post-delete-confirm[data-post-id="' + btn.dataset.postId + '"]');
+            const confirmBar = container.querySelector(`.post-delete-confirm[data-post-id="${btn.dataset.postId}"]`);
             if (confirmBar) confirmBar.style.display = 'none';
         });
     });
@@ -869,11 +877,14 @@ function renderFeed(posts) {
 
 function renderPostCard(post) {
     const lower = (post.author || 'a').toLowerCase();
-    const avatarClass = 'user-' + lower;
+    const avatarClass = `user-${lower}`;
     const timeStr = timeAgo(post.createdAt);
     const commentCount = post.commentCount || 0;
+
+    // Reactions
     const reactions = post.reactions || {};
     const myReaction = reactions[currentUser.toLowerCase()] || null;
+    // Build reaction summary
     const reactionCounts = {};
     Object.values(reactions).forEach(r => { reactionCounts[r] = (reactionCounts[r] || 0) + 1; });
     const totalReactions = Object.keys(reactions).length;
@@ -882,54 +893,57 @@ function renderPostCard(post) {
     if (totalReactions > 0) {
         const badges = Object.entries(reactionCounts).map(([type, count]) => {
             const info = REACTION_TYPES[type];
-            return info ? '<span class="reaction-badge"><span class="r-emoji">' + info.emoji + '</span><span class="r-count">' + count + '</span></span>' : '';
+            return info ? `<span class="reaction-badge"><span class="r-emoji">${info.emoji}</span><span class="r-count">${count}</span></span>` : '';
         }).join('');
-        reactionSummaryHtml = '<div class="reaction-summary">' + badges + '</div>';
+        reactionSummaryHtml = `<div class="reaction-summary">${badges}</div>`;
     }
 
     let imageHtml = '';
     if (post.imageData) {
-        imageHtml = '<div class="post-image-wrapper" data-post-id="' + post.id + '" data-post-author="' + post.author + '"><img src="' + post.imageData + '" alt="Post image" loading="lazy"></div>';
+        imageHtml = `<div class="post-image-wrapper" data-post-id="${post.id}" data-post-author="${post.author}">
+            <img src="${post.imageData}" alt="Post image" loading="lazy"></div>`;
     }
 
     let commentPreview = '';
     if (commentCount > 0) {
-        commentPreview = '<div class="post-comment-preview" data-post-id="' + post.id + '">View ' + (commentCount === 1 ? 'comment' : 'all ' + commentCount + ' comments') + '</div>';
+        commentPreview = `<div class="post-comment-preview" data-post-id="${post.id}">View ${commentCount === 1 ? 'comment' : 'all ' + commentCount + ' comments'}</div>`;
     }
 
     let textHtml = '';
-    if (post.text) textHtml = '<div class="post-text-content">' + escapeHtml(post.text) + '</div>';
+    if (post.text) textHtml = `<div class="post-text-content">${escapeHtml(post.text)}</div>`;
 
-    const reactEmoji = myReaction ? (REACTION_TYPES[myReaction] ? REACTION_TYPES[myReaction].emoji : '❤️') : '';
+    // Reaction button shows current reaction emoji or default heart
+    const reactEmoji = myReaction ? (REACTION_TYPES[myReaction]?.emoji || '❤️') : '';
     const reactIcon = myReaction ? reactEmoji : '<i class="far fa-heart"></i>';
 
     const deleteBtn = post.author === currentUser
-        ? '<button class="post-delete-btn" data-post-id="' + post.id + '" title="Delete post"><i class="fas fa-trash-alt"></i></button>'
+        ? `<button class="post-delete-btn" data-post-id="${post.id}" title="Delete post"><i class="fas fa-trash-alt"></i></button>`
         : '';
 
-    return '<div class="post-card" data-post-id="' + post.id + '">' +
-        '<div class="post-header">' +
-            '<div class="post-avatar ' + avatarClass + '">' + (post.author || '?') + '</div>' +
-            '<div class="post-user-info">' +
-                '<div class="post-author">' + escapeHtml(post.author || 'Unknown') + '</div>' +
-                '<div class="post-time">' + timeStr + '</div>' +
-            '</div>' +
-            deleteBtn +
-        '</div>' +
-        imageHtml +
-        textHtml +
-        '<div class="post-actions">' +
-            '<button class="post-action-btn react-btn" data-post-id="' + post.id + '" data-post-author="' + post.author + '">' + reactIcon + '</button>' +
-            '<button class="post-action-btn comment-btn" data-post-id="' + post.id + '"><i class="far fa-comment"></i></button>' +
-        '</div>' +
-        reactionSummaryHtml +
-        commentPreview +
-        '<div class="post-delete-confirm" data-post-id="' + post.id + '" style="display:none">' +
-            '<span>Delete this post?</span>' +
-            '<button class="confirm-del-yes" data-post-id="' + post.id + '">Delete</button>' +
-            '<button class="confirm-del-no" data-post-id="' + post.id + '">Cancel</button>' +
-        '</div>' +
-    '</div>';
+    return `
+        <div class="post-card" data-post-id="${post.id}">
+            <div class="post-header">
+                <div class="post-avatar ${avatarClass}">${post.author || '?'}</div>
+                <div class="post-user-info">
+                    <div class="post-author">${escapeHtml(post.author || 'Unknown')}</div>
+                    <div class="post-time">${timeStr}</div>
+                </div>
+                ${deleteBtn}
+            </div>
+            ${imageHtml}
+            ${textHtml}
+            <div class="post-actions">
+                <button class="post-action-btn react-btn" data-post-id="${post.id}" data-post-author="${post.author}">${reactIcon}</button>
+                <button class="post-action-btn comment-btn" data-post-id="${post.id}"><i class="far fa-comment"></i></button>
+            </div>
+            ${reactionSummaryHtml}
+            ${commentPreview}
+            <div class="post-delete-confirm" data-post-id="${post.id}" style="display:none">
+                <span>Delete this post?</span>
+                <button class="confirm-del-yes" data-post-id="${post.id}">Delete</button>
+                <button class="confirm-del-no" data-post-id="${post.id}">Cancel</button>
+            </div>
+        </div>`;
 }
 
 // ============ REACTIONS ============
@@ -943,6 +957,8 @@ function openReactionPicker(btn) {
     picker.style.top = (rect.top - 48) + 'px';
     picker.style.display = 'flex';
     currentReactTarget = { postId: btn.dataset.postId, postAuthor: btn.dataset.postAuthor };
+
+    // Set up reaction option clicks
     picker.querySelectorAll('.reaction-opt').forEach(opt => {
         opt.onclick = () => {
             addReaction(currentReactTarget.postId, currentReactTarget.postAuthor, opt.dataset.reaction);
@@ -955,15 +971,15 @@ async function addReaction(postId, postAuthor, reactionType) {
     try {
         const postRef = fdb.collection(POSTS_COLLECTION).doc(postId);
         const userKey = currentUser.toLowerCase();
+        // Check if user already has this reaction
         const doc = await postRef.get();
         if (!doc.exists) return;
         const reactions = doc.data().reactions || {};
         if (reactions[userKey] === reactionType) {
-            await postRef.update({ ['reactions.' + userKey]: firebase.firestore.FieldValue.delete() });
+            // Remove reaction (toggle off)
+            await postRef.update({ [`reactions.${userKey}`]: firebase.firestore.FieldValue.delete() });
         } else {
-            // Encrypt the reaction type
-            const encReaction = isEncryptionSetup ? await encryptText(reactionType) : reactionType;
-            await postRef.update({ ['reactions.' + userKey]: encReaction });
+            await postRef.update({ [`reactions.${userKey}`]: reactionType });
         }
     } catch (e) { console.error('Add reaction failed:', e); }
 }
@@ -973,6 +989,7 @@ function handleDoubleTapLike(postId, postAuthor) {
     heart.classList.remove('show'); void heart.offsetWidth;
     heart.style.display = 'block'; heart.classList.add('show');
     setTimeout(() => { heart.style.display = 'none'; heart.classList.remove('show'); }, 800);
+    // Default double-tap = heart reaction
     addReaction(postId, postAuthor, 'heart');
 }
 
@@ -1022,15 +1039,15 @@ function renderComments(comments) {
     }
     list.innerHTML = comments.map(c => {
         const lower = (c.author || 'a').toLowerCase();
-        const avatarClass = 'user-' + lower;
-        return '<div class="comment-item">' +
-            '<div class="comment-avatar ' + avatarClass + '">' + (c.author || '?') + '</div>' +
-            '<div class="comment-body">' +
-                '<span class="comment-author">' + escapeHtml(c.author || 'Unknown') + '</span>' +
-                '<div class="comment-text">' + escapeHtml(c.text || '') + '</div>' +
-                '<div class="comment-time">' + timeAgo(c.createdAt) + '</div>' +
-            '</div>' +
-        '</div>';
+        const avatarClass = `user-${lower}`;
+        return `<div class="comment-item">
+            <div class="comment-avatar ${avatarClass}">${c.author || '?'}</div>
+            <div class="comment-body">
+                <span class="comment-author">${escapeHtml(c.author || 'Unknown')}</span>
+                <div class="comment-text">${escapeHtml(c.text || '')}</div>
+                <div class="comment-time">${timeAgo(c.createdAt)}</div>
+            </div>
+        </div>`;
     }).join('');
     list.scrollTop = list.scrollHeight;
 }
@@ -1120,6 +1137,7 @@ async function createPost() {
         if (isOnline()) {
             await fdb.collection(POSTS_COLLECTION).add(postData);
         } else {
+            // Queue for later, show immediately
             queueWrite({ type: 'post', data: { ...postData, createdAt: new Date().toISOString() } });
             const tempPost = {
                 id: 'pending_' + Date.now(), author: currentUser,
@@ -1144,10 +1162,12 @@ async function createPost() {
 
 async function deletePost(postId) {
     try {
+        // Delete all comments for this post first
         const commentsSnapshot = await fdb.collection(COMMENTS_COLLECTION)
             .where('postId', '==', postId).get();
         const batch = fdb.batch();
         commentsSnapshot.forEach(doc => batch.delete(doc.ref));
+        // Delete the post itself
         batch.delete(fdb.collection(POSTS_COLLECTION).doc(postId));
         await batch.commit();
         showToast('Post deleted');
@@ -1200,7 +1220,9 @@ function renderGallery(posts) {
     grid.style.display = 'grid';
     grid.innerHTML = imagePosts.map(p => {
         const lower = (p.author || 'a').toLowerCase();
-        return '<div class="gallery-item" data-image="' + p.imageData + '"><img src="' + p.imageData + '" alt="Photo by ' + p.author + '" loading="lazy"><div class="gallery-author-dot user-' + lower + '">' + (p.author || '?') + '</div></div>';
+        return `<div class="gallery-item" data-image="${p.imageData}">
+            <img src="${p.imageData}" alt="Photo by ${p.author}" loading="lazy">
+            <div class="gallery-author-dot user-${lower}">${p.author || '?'}</div></div>`;
     }).join('');
     grid.querySelectorAll('.gallery-item').forEach(item => {
         item.addEventListener('click', () => openImageViewer(item.dataset.image));
@@ -1219,6 +1241,7 @@ function renderTimeline(posts) {
         return;
     }
     emptyEl.style.display = 'none';
+    // Group by month
     const grouped = {};
     posts.forEach(p => {
         const date = p.createdAt ? (p.createdAt.toDate ? p.createdAt.toDate() : new Date(p.createdAt)) : new Date();
@@ -1234,14 +1257,27 @@ function renderTimeline(posts) {
         const [year, month] = key.split('-');
         const label = monthNames[parseInt(month) - 1] + ' ' + year;
         const monthPosts = grouped[key];
-        html += '<div class="timeline-month"><div class="timeline-month-header"><div class="timeline-month-dot"></div><span class="timeline-month-label">' + label + '</span><div class="timeline-month-line"></div><span style="font-size:12px;color:var(--text-light)">' + monthPosts.length + ' moment' + (monthPosts.length > 1 ? 's' : '') + '</span></div>';
+        html += `<div class="timeline-month">
+            <div class="timeline-month-header">
+                <div class="timeline-month-dot"></div>
+                <span class="timeline-month-label">${label}</span>
+                <div class="timeline-month-line"></div>
+                <span style="font-size:12px;color:var(--text-light)">${monthPosts.length} moment${monthPosts.length > 1 ? 's' : ''}</span>
+            </div>`;
         monthPosts.forEach(p => {
             const lower = (p.author || 'a').toLowerCase();
-            const avatarClass = 'user-' + lower;
+            const avatarClass = `user-${lower}`;
             const timeStr = timeAgo(p.createdAt);
             let imgHtml = '';
-            if (p.imageData) imgHtml = '<img class="timeline-item-img" src="' + p.imageData + '" alt="" onclick="openImageViewer(this.src)">';
-            html += '<div class="timeline-item"><div class="timeline-item-avatar ' + avatarClass + '">' + (p.author || '?') + '</div><div class="timeline-item-body"><div class="timeline-item-text">' + escapeHtml(p.text || '') + '</div><div class="timeline-item-time">' + timeStr + '</div></div>' + imgHtml + '</div>';
+            if (p.imageData) imgHtml = `<img class="timeline-item-img" src="${p.imageData}" alt="" onclick="openImageViewer('${p.imageData.replace(/'/g, "\\'")}')">`;
+            html += `<div class="timeline-item">
+                <div class="timeline-item-avatar ${avatarClass}">${p.author || '?'}</div>
+                <div class="timeline-item-body">
+                    <div class="timeline-item-text">${escapeHtml(p.text || '')}</div>
+                    <div class="timeline-item-time">${timeStr}</div>
+                </div>
+                ${imgHtml}
+            </div>`;
         });
         html += '</div>';
     });
@@ -1282,9 +1318,26 @@ function renderCapsules(capsules) {
         const canOpen = now >= openDate;
         const dateStr = openDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         if (canOpen) {
-            return '<div class="capsule-card" onclick="openCapsuleView(\'' + c.id + '\')"><div class="capsule-opened"><div class="capsule-open-icon">🎁</div><div class="capsule-open-info"><div class="capsule-open-label">Opened Capsule</div><div class="capsule-open-preview">' + escapeHtml((c.text || '').substring(0, 50)) + ((c.text || '').length > 50 ? '...' : '') + '</div></div><div class="capsule-open-arrow"><i class="fas fa-chevron-right"></i></div></div></div>';
+            return `<div class="capsule-card" onclick="openCapsuleView('${c.id}')">
+                <div class="capsule-opened">
+                    <div class="capsule-open-icon">🎁</div>
+                    <div class="capsule-open-info">
+                        <div class="capsule-open-label">Opened Capsule</div>
+                        <div class="capsule-open-preview">${escapeHtml((c.text || '').substring(0, 50))}${(c.text || '').length > 50 ? '...' : ''}</div>
+                    </div>
+                    <div class="capsule-open-arrow"><i class="fas fa-chevron-right"></i></div>
+                </div></div>`;
         } else {
-            return '<div class="capsule-card"><div class="capsule-sealed"><div class="capsule-seal-icon"><i class="fas fa-lock"></i></div><div class="capsule-seal-info"><div class="capsule-seal-label">Sealed Capsule</div><div class="capsule-seal-date">Opens on ' + dateStr + '</div><div class="capsule-seal-author">By ' + (c.author || '?') + '</div></div><div class="capsule-seal-lock"><i class="fas fa-hourglass-half"></i></div></div></div>';
+            return `<div class="capsule-card">
+                <div class="capsule-sealed">
+                    <div class="capsule-seal-icon"><i class="fas fa-lock"></i></div>
+                    <div class="capsule-seal-info">
+                        <div class="capsule-seal-label">Sealed Capsule</div>
+                        <div class="capsule-seal-date">Opens on ${dateStr}</div>
+                        <div class="capsule-seal-author">By ${c.author || '?'}</div>
+                    </div>
+                    <div class="capsule-seal-lock"><i class="fas fa-hourglass-half"></i></div>
+                </div></div>`;
         }
     }).join('');
 }
@@ -1352,9 +1405,14 @@ async function openCapsuleView(capsuleId) {
             if (data.imageData) data.imageData = await decryptField(data.imageData, doc.id, 'imageData');
         }
         const dateStr = data.openDate ? new Date(data.openDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
-        let imgHtml = data.imageData ? '<img class="capsule-view-img" src="' + data.imageData + '" alt="Capsule photo">' : '';
-        document.getElementById('capsuleViewContent').innerHTML =
-            '<div class="capsule-view-meta"><div class="capsule-view-author">From ' + (data.author || '?') + '</div><div class="capsule-view-date">Opened on ' + dateStr + '</div></div>' + imgHtml + '<div class="capsule-view-text">' + escapeHtml(data.text || '') + '</div>';
+        let imgHtml = data.imageData ? `<img class="capsule-view-img" src="${data.imageData}" alt="Capsule photo">` : '';
+        document.getElementById('capsuleViewContent').innerHTML = `
+            <div class="capsule-view-meta">
+                <div class="capsule-view-author">From ${data.author || '?'}</div>
+                <div class="capsule-view-date">Opened on ${dateStr}</div>
+            </div>
+            ${imgHtml}
+            <div class="capsule-view-text">${escapeHtml(data.text || '')}</div>`;
         document.getElementById('capsuleViewModal').style.display = 'flex';
     } catch (e) { console.error('Open capsule failed:', e); }
 }
@@ -1373,7 +1431,6 @@ function attachCountdownsListener() {
                 const data = doc.data();
                 if (isEncryptionSetup) {
                     if (data.name) data.name = await decryptField(data.name, doc.id, 'name');
-                    if (data.emoji) data.emoji = await decryptField(data.emoji, doc.id, 'emoji');
                 }
                 countdowns.push({ id: doc.id, ...data });
             }
@@ -1397,7 +1454,18 @@ function renderCountdowns(countdowns) {
         const isPast = diffDays < 0;
         const days = Math.abs(diffDays);
         const dateStr = target.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        return '<div class="countdown-card ' + (isPast ? 'countdown-past' : '') + '"><div class="countdown-emoji">' + (c.emoji || '📅') + '</div><div class="countdown-info"><div class="countdown-name">' + escapeHtml(c.name || '') + '</div><div class="countdown-date-label">' + dateStr + '</div></div><div class="countdown-days"><div class="countdown-days-num">' + days + '</div><div class="countdown-days-label">' + (isPast ? 'days ago' : 'days') + '</div></div><button class="countdown-delete" onclick="event.stopPropagation();deleteCountdown(\'' + c.id + '\')"><i class="fas fa-times"></i></button></div>';
+        return `<div class="countdown-card ${isPast ? 'countdown-past' : ''}">
+            <div class="countdown-emoji">${c.emoji || '📅'}</div>
+            <div class="countdown-info">
+                <div class="countdown-name">${escapeHtml(c.name || '')}</div>
+                <div class="countdown-date-label">${dateStr}</div>
+            </div>
+            <div class="countdown-days">
+                <div class="countdown-days-num">${days}</div>
+                <div class="countdown-days-label">${isPast ? 'days ago' : 'days'}</div>
+            </div>
+            <button class="countdown-delete" onclick="event.stopPropagation();deleteCountdown('${c.id}')"><i class="fas fa-times"></i></button>
+        </div>`;
     }).join('');
 }
 
@@ -1420,10 +1488,8 @@ async function createCountdown() {
     const activeEmoji = document.querySelector('.emoji-pick.active');
     const emoji = activeEmoji ? activeEmoji.dataset.emoji : '📅';
     try {
-        const encName = isEncryptionSetup ? await encryptText(name) : name;
-        const encEmoji = isEncryptionSetup ? await encryptText(emoji) : emoji;
         await fdb.collection(COUNTDOWNS_COLLECTION).add({
-            author: currentUser, name: encName, targetDate: targetDate, emoji: encEmoji,
+            author: currentUser, name: isEncryptionSetup ? await encryptText(name) : name, targetDate, emoji,
             encrypted: isEncryptionSetup,
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -1459,6 +1525,7 @@ function attachMoodsListener() {
 }
 
 function updateMoodUI(moods) {
+    // Update my mood in top bar
     const myMood = moods[currentUser.toLowerCase()];
     if (myMood && myMood.mood) {
         const moodInfo = MOOD_MAP[myMood.mood];
@@ -1466,13 +1533,14 @@ function updateMoodUI(moods) {
     } else {
         document.getElementById('moodEmojiTop').textContent = '😊';
     }
+    // Update partner mood bar
     const partner = currentUser === 'A' ? 'p' : 'a';
     const partnerMood = moods[partner];
     const bar = document.getElementById('partnerMoodBar');
     if (partnerMood && partnerMood.mood) {
         const moodInfo = MOOD_MAP[partnerMood.mood];
         document.getElementById('partnerMoodAvatar').textContent = partner.toUpperCase();
-        document.getElementById('partnerMoodAvatar').className = 'partner-mood-avatar user-' + partner;
+        document.getElementById('partnerMoodAvatar').className = `partner-mood-avatar user-${partner}`;
         document.getElementById('partnerMoodText').textContent = partnerMood.customText || (moodInfo ? moodInfo.text : '');
         document.getElementById('partnerMoodEmoji').textContent = moodInfo ? moodInfo.emoji : '';
         bar.style.display = 'flex';
@@ -1485,6 +1553,7 @@ let selectedMood = null;
 
 function openMoodSetter() {
     document.getElementById('moodModal').style.display = 'flex';
+    // Pre-select current mood
     const myMood = allMoodsCache[currentUser.toLowerCase()];
     selectedMood = myMood ? myMood.mood : null;
     document.querySelectorAll('.mood-opt').forEach(opt => {
@@ -1526,38 +1595,50 @@ function getDailyPrompt() {
 
 function getTodayKey() {
     const d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function loadDailyNote() {
     const prompt = getDailyPrompt();
     document.getElementById('dailyNotePrompt').textContent = prompt;
     const todayKey = getTodayKey();
+
+    // Listen for today's note
     fdb.collection(DAILY_NOTES_COLLECTION).doc(todayKey)
         .onSnapshot(async doc => {
             const banner = document.getElementById('dailyNoteBanner');
             if (!doc.exists) { banner.style.display = 'flex'; return; }
             const data = doc.data();
-            if (isEncryptionSetup && data.responses) {
-                for (const key of Object.keys(data.responses)) {
-                    data.responses[key] = await decryptText(data.responses[key]);
+            if (isEncryptionSetup) {
+                if (data.responses) {
+                    for (const key of Object.keys(data.responses)) {
+                        data.responses[key] = await decryptText(data.responses[key]);
+                    }
                 }
             }
             const myKey = currentUser.toLowerCase();
             const hasResponded = data.responses && data.responses[myKey];
+            // Show banner if user hasn't responded yet
             banner.style.display = hasResponded ? 'none' : 'flex';
             banner.querySelector('.daily-note-action').innerHTML = hasResponded
                 ? '<i class="fas fa-check" style="color:var(--secondary)"></i>'
                 : '<i class="fas fa-pen"></i>';
         });
+
+    // Banner click
+    document.getElementById('dailyNoteBanner').addEventListener('click', () => openDailyNoteModal());
 }
 
 function openDailyNoteModal() {
     document.getElementById('dailyNoteModal').style.display = 'flex';
     document.getElementById('dailyNoteModalPrompt').textContent = getDailyPrompt();
     document.getElementById('dailyNoteInput').value = '';
+
     const todayKey = getTodayKey();
+    const partner = currentUser === 'A' ? 'P' : 'p';
     const partnerKey = currentUser === 'A' ? 'p' : 'a';
+
+    // Load existing note
     fdb.collection(DAILY_NOTES_COLLECTION).doc(todayKey).get().then(async doc => {
         const partnerSection = document.getElementById('dailyNotePartnerResponse');
         if (doc.exists) {
@@ -1595,7 +1676,7 @@ async function submitDailyNote() {
         const encText = isEncryptionSetup ? await encryptText(rawText) : rawText;
         await fdb.collection(DAILY_NOTES_COLLECTION).doc(todayKey).set({
             prompt: getDailyPrompt(),
-            ['responses.' + myKey]: encText,
+            [`responses.${myKey}`]: encText,
             encrypted: isEncryptionSetup,
             date: todayKey,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1610,18 +1691,51 @@ async function submitDailyNote() {
 function renderProfile() {
     if (!currentUser) return;
     const lower = currentUser.toLowerCase();
-    const avatarClass = 'user-' + lower;
+    const avatarClass = `user-${lower}`;
     const container = document.getElementById('profileContent');
+
     const encStatus = isEncryptionSetup
         ? '<div class="profile-enc-status enc-on"><i class="fas fa-shield-halved"></i> Encrypted</div>'
         : '<div class="profile-enc-status enc-off"><i class="fas fa-lock-open"></i> Not encrypted</div>';
+
     const myMood = allMoodsCache[currentUser.toLowerCase()];
     let moodHtml = '<span style="color:var(--text-light)">Not set</span>';
     if (myMood && myMood.mood) {
         const moodInfo = MOOD_MAP[myMood.mood];
-        if (moodInfo) moodHtml = moodInfo.emoji + ' ' + moodInfo.text;
+        moodHtml = `${moodInfo.emoji} ${moodInfo.text}`;
     }
-    container.innerHTML = '<div class="profile-card"><div class="profile-avatar-large ' + avatarClass + '">' + currentUser + '</div><div class="profile-name">' + escapeHtml(currentUser) + '</div><div class="profile-joined">Member of LoveLore</div><button class="anni-edit-btn" id="editAnniversaryBtn" onclick="openAnniversaryEditor()"><i class="fas fa-calendar-heart"></i> Set Anniversary</button><div class="profile-stats"><div class="profile-stat"><div class="profile-stat-number" id="profilePostCount">0</div><div class="profile-stat-label">Posts</div></div><div class="profile-stat"><div class="profile-stat-number" id="profileLikeCount">0</div><div class="profile-stat-label">Reactions</div></div></div><div class="profile-mood-section"><div class="profile-mood-current">Mood: ' + moodHtml + '</div><button class="profile-mood-btn" onclick="openMoodSetter()"><i class="fas fa-face-smile"></i> Change Mood</button></div><div class="profile-enc-section">' + encStatus + '</div></div><div class="profile-shortcuts" style="display:flex;gap:8px;margin-bottom:16px;"><button class="profile-mood-btn" onclick="switchScreen(\'timelineScreen\')" style="flex:1;justify-content:center"><i class="fas fa-clock-rotate-left"></i> Timeline</button><button class="profile-mood-btn" onclick="switchScreen(\'galleryScreen\')" style="flex:1;justify-content:center"><i class="fas fa-images"></i> Gallery</button></div><div class="profile-section-title">My Posts</div><div id="profileGrid" class="profile-grid"></div><div id="profileEmptyPosts" class="profile-empty-posts">No posts yet. Share your first moment!</div>';
+
+    container.innerHTML = `
+        <div class="profile-card">
+            <div class="profile-avatar-large ${avatarClass}">${currentUser}</div>
+            <div class="profile-name">${escapeHtml(currentUser)}</div>
+            <div class="profile-joined">Member of LoveLore</div>
+            <button class="anni-edit-btn" id="editAnniversaryBtn" onclick="openAnniversaryEditor()">
+                <i class="fas fa-calendar-heart"></i> Set Anniversary
+            </button>
+            <div class="profile-stats">
+                <div class="profile-stat">
+                    <div class="profile-stat-number" id="profilePostCount">0</div>
+                    <div class="profile-stat-label">Posts</div>
+                </div>
+                <div class="profile-stat">
+                    <div class="profile-stat-number" id="profileLikeCount">0</div>
+                    <div class="profile-stat-label">Reactions</div>
+                </div>
+            </div>
+            <div class="profile-mood-section">
+                <div class="profile-mood-current">Mood: ${moodHtml}</div>
+                <button class="profile-mood-btn" onclick="openMoodSetter()"><i class="fas fa-face-smile"></i> Change Mood</button>
+            </div>
+            <div class="profile-enc-section">${encStatus}</div>
+        </div>
+        <div class="profile-shortcuts" style="display:flex;gap:8px;margin-bottom:16px;">
+            <button class="profile-mood-btn" onclick="switchScreen('timelineScreen')" style="flex:1;justify-content:center"><i class="fas fa-clock-rotate-left"></i> Timeline</button>
+            <button class="profile-mood-btn" onclick="switchScreen('galleryScreen')" style="flex:1;justify-content:center"><i class="fas fa-images"></i> Gallery</button>
+        </div>
+        <div class="profile-section-title">My Posts</div>
+        <div id="profileGrid" class="profile-grid"></div>
+        <div id="profileEmptyPosts" class="profile-empty-posts">No posts yet. Share your first moment!</div>`;
     loadProfileStats();
 }
 
@@ -1651,7 +1765,9 @@ function loadProfileStats() {
             const emptyEl = document.getElementById('profileEmptyPosts');
             if (!grid) return;
             if (imagePosts.length > 0) {
-                grid.innerHTML = imagePosts.map(p => '<div class="profile-grid-item" data-image="' + p.imageData + '"><img src="' + p.imageData + '" alt="Post" loading="lazy"></div>').join('');
+                grid.innerHTML = imagePosts.map(p => `
+                    <div class="profile-grid-item" data-image="${p.imageData}">
+                        <img src="${p.imageData}" alt="Post" loading="lazy"></div>`).join('');
                 grid.style.display = 'grid';
                 if (emptyEl) emptyEl.style.display = 'none';
                 grid.querySelectorAll('.profile-grid-item').forEach(item => {
@@ -1670,6 +1786,7 @@ function loadAnniversary() {
     fdb.collection(SETTINGS_COLLECTION).doc('anniversary').onSnapshot(async doc => {
         if (doc.exists && doc.data().date) { renderAnniversary(doc.data().date); }
         else {
+            // Try offline cache
             const cached = await getCachedData('anniversary');
             if (cached) { renderAnniversary(cached); }
             else { document.getElementById('anniversaryBanner').style.display = 'none'; }
@@ -1707,7 +1824,19 @@ function openAnniversaryEditor() {
     overlay.id = 'anniversaryEditorModal';
     overlay.className = 'modal-overlay';
     overlay.style.display = 'flex';
-    overlay.innerHTML = '<div class="modal-sheet" style="max-height:50vh"><div class="modal-handle"></div><div class="modal-header"><h2><i class="fas fa-heart" style="color:var(--primary);margin-right:8px"></i>Our Anniversary</h2><button class="modal-close" onclick="document.getElementById(\'anniversaryEditorModal\').remove()"><i class="fas fa-times"></i></button></div><div style="padding:0 20px 20px;text-align:center"><p style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">When did your love story begin?</p><input type="datetime-local" id="anniDateInput" class="input-field" style="padding-left:16px;text-align:center;font-size:16px"><button class="btn-primary" style="margin-top:16px" onclick="saveAnniversaryFromEditor()"><i class="fas fa-heart"></i> Save</button></div></div>';
+    overlay.innerHTML = `
+        <div class="modal-sheet" style="max-height:50vh">
+            <div class="modal-handle"></div>
+            <div class="modal-header">
+                <h2><i class="fas fa-heart" style="color:var(--primary);margin-right:8px"></i>Our Anniversary</h2>
+                <button class="modal-close" onclick="document.getElementById('anniversaryEditorModal').remove()"><i class="fas fa-times"></i></button>
+            </div>
+            <div style="padding:0 20px 20px;text-align:center">
+                <p style="color:var(--text-secondary);font-size:14px;margin-bottom:16px">When did your love story begin?</p>
+                <input type="datetime-local" id="anniDateInput" class="input-field" style="padding-left:16px;text-align:center;font-size:16px">
+                <button class="btn-primary" style="margin-top:16px" onclick="saveAnniversaryFromEditor()"><i class="fas fa-heart"></i> Save</button>
+            </div>
+        </div>`;
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
 }
@@ -1725,7 +1854,7 @@ function switchScreen(screenId) {
     document.querySelectorAll('.app-screen').forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    const navBtn = document.querySelector('.nav-btn[data-screen="' + screenId + '"]');
+    const navBtn = document.querySelector(`.nav-btn[data-screen="${screenId}"]`);
     if (navBtn) navBtn.classList.add('active');
     document.getElementById('fabCreate').style.display = screenId === 'feedScreen' ? 'flex' : 'none';
     const topBar = document.querySelector('.top-bar');
@@ -1735,6 +1864,7 @@ function switchScreen(screenId) {
         if (topBar) topBar.style.display = 'none';
         if (bottomNav) bottomNav.classList.add('chat-hidden');
         if (offlineBanner) offlineBanner.style.display = 'none';
+        // Mark chat messages as read when entering chat
         setTimeout(() => markMessagesAsRead(), 500);
     } else {
         if (topBar) topBar.style.display = 'flex';
@@ -1787,6 +1917,7 @@ function escapeHtml(text) {
 
 // ============ CHAT SYSTEM ============
 
+// ---- Chat Listener ----
 function attachChatListener() {
     if (chatUnsubscribe) chatUnsubscribe();
     chatUnsubscribe = fdb.collection(MESSAGES_COLLECTION)
@@ -1801,14 +1932,6 @@ function attachChatListener() {
                     if (data.imageData) data.imageData = await decryptField(data.imageData, doc.id, 'imageData');
                     if (data.voiceData) data.voiceData = await decryptField(data.voiceData, doc.id, 'voiceData');
                     if (data.replyToText) data.replyToText = await decryptField(data.replyToText, doc.id, 'replyToText');
-                    // Decrypt chat reactions
-                    if (data.reactions) {
-                        const decReactions = {};
-                        for (const [k, v] of Object.entries(data.reactions)) {
-                            decReactions[k] = isEncryptionSetup && typeof v === 'string' && v.startsWith('ENC:') ? await decryptField(v, doc.id, 'chatreact_' + k) : v;
-                        }
-                        data.reactions = decReactions;
-                    }
                 }
                 msgs.push({ id: doc.id, ...data });
             }
@@ -1818,6 +1941,7 @@ function attachChatListener() {
         }, error => console.error('Chat listener error:', error));
 }
 
+// ---- Chat Meta Listener (online status + typing) ----
 function attachChatMetaListener() {
     if (chatMetaUnsubscribe) chatMetaUnsubscribe();
     chatMetaUnsubscribe = fdb.collection(CHAT_META_COLLECTION).doc('status')
@@ -1826,11 +1950,14 @@ function attachChatMetaListener() {
             const data = doc.data();
             const partner = currentUser === 'A' ? 'p' : 'a';
             const partnerUpper = partner.toUpperCase();
+
+            // Update partner online status
             const avatar = document.getElementById('chatPartnerAvatar');
             const statusEl = document.getElementById('chatPartnerStatus');
             if (avatar) {
-                avatar.className = 'chat-partner-avatar user-' + partner;
+                avatar.className = `chat-partner-avatar user-${partner}`;
                 avatar.textContent = partnerUpper;
+                // Remove existing dot
                 const existingDot = avatar.querySelector('.online-dot');
                 if (existingDot) existingDot.remove();
                 if (data[partner] && data[partner].isOnline) {
@@ -1847,6 +1974,8 @@ function attachChatMetaListener() {
                     }
                 }
             }
+
+            // Update typing indicator
             const typingKey = 'typing' + partner.toUpperCase();
             const typingUpdateKey = 'typingUpdatedAt' + partner.toUpperCase();
             if (data[typingKey] && data[typingUpdateKey]) {
@@ -1858,6 +1987,7 @@ function attachChatMetaListener() {
                         statusEl.className = 'chat-partner-status typing';
                     }
                 } else {
+                    // Clear stale typing
                     setPartnerTypingState(false);
                 }
             }
@@ -1868,6 +1998,7 @@ function setPartnerTypingState(isTyping) {
     const statusEl = document.getElementById('chatPartnerStatus');
     if (!statusEl) return;
     if (!isTyping) {
+        // Restore online/offline status
         const avatar = document.getElementById('chatPartnerAvatar');
         const dot = avatar ? avatar.querySelector('.online-dot') : null;
         if (dot) { statusEl.textContent = 'online'; statusEl.className = 'chat-partner-status online-status'; }
@@ -1885,25 +2016,38 @@ function renderChatMessages(messages) {
         return;
     }
     if (emptyEl) emptyEl.style.display = 'none';
+
+    // Check if we should auto-scroll
     const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+
     let html = '';
     let lastDate = null;
+
     messages.forEach(msg => {
         const msgDate = msg.createdAt ? (msg.createdAt.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt)) : new Date();
         const dateStr = msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+        // Date separator
         if (dateStr !== lastDate) {
-            html += '<div class="chat-date-sep"><span>' + dateStr + '</span></div>';
+            html += `<div class="chat-date-sep"><span>${dateStr}</span></div>`;
             lastDate = dateStr;
         }
+
         html += renderChatBubble(msg);
     });
+
     container.innerHTML = html;
+
+    // Auto-scroll
     if (wasAtBottom) {
         container.scrollTop = container.scrollHeight;
     } else {
+        // Show new messages button
         const newMsgBtn = document.getElementById('chatNewMsgBtn');
         if (newMsgBtn) newMsgBtn.style.display = 'flex';
     }
+
+    // Bind events
     bindChatMessageEvents();
 }
 
@@ -1913,26 +2057,33 @@ function renderChatBubble(msg) {
     const time = formatChatTime(msg.createdAt);
 
     if (msg.deleted) {
-        return '<div class="chat-msg ' + cls + '" data-msg-id="' + msg.id + '"><div class="chat-bubble"><span class="chat-msg-deleted">Message deleted</span><div class="chat-msg-meta"><span class="chat-msg-time">' + time + '</span></div></div></div>';
+        return `<div class="chat-msg ${cls}" data-msg-id="${msg.id}">
+            <div class="chat-bubble"><span class="chat-msg-deleted">Message deleted</span>
+            <div class="chat-msg-meta"><span class="chat-msg-time">${time}</span></div></div></div>`;
     }
 
+    // Reply reference
     let replyHtml = '';
     if (msg.replyTo) {
         const replyAuthor = msg.replyToAuthor || '?';
         const replyText = (msg.replyToText || '').substring(0, 60);
-        replyHtml = '<div class="chat-msg-reply-ref"><div class="chat-msg-reply-ref-author">' + escapeHtml(replyAuthor) + '</div><div class="chat-msg-reply-ref-text">' + escapeHtml(replyText) + '</div></div>';
+        replyHtml = `<div class="chat-msg-reply-ref">
+            <div class="chat-msg-reply-ref-author">${escapeHtml(replyAuthor)}</div>
+            <div class="chat-msg-reply-ref-text">${escapeHtml(replyText)}</div></div>`;
     }
 
+    // Content
     let contentHtml = '';
     if (msg.voiceData) {
         contentHtml = renderVoiceMessage(msg.voiceData, isMine, msg.id);
     } else if (msg.imageData) {
-        contentHtml = '<img class="chat-bubble-img" src="' + msg.imageData + '" alt="Photo" onclick="openImageViewer(this.src)">';
+        contentHtml = `<img class="chat-bubble-img" src="${msg.imageData}" alt="Photo" onclick="openImageViewer('${msg.imageData.replace(/'/g, "\\'")}')">`;
     }
     if (msg.text) {
-        contentHtml += '<div>' + escapeHtml(msg.text) + '</div>';
+        contentHtml += `<div>${escapeHtml(msg.text)}</div>`;
     }
 
+    // Read receipts
     let readHtml = '';
     if (isMine) {
         const readBy = msg.readBy || {};
@@ -1944,26 +2095,33 @@ function renderChatBubble(msg) {
         }
     }
 
+    // Reactions
     let reactionsHtml = '';
     if (msg.reactions && Object.keys(msg.reactions).length > 0) {
         const counts = {};
         Object.values(msg.reactions).forEach(r => { counts[r] = (counts[r] || 0) + 1; });
         const badges = Object.entries(counts).map(([type, count]) => {
             const info = REACTION_TYPES[type];
-            return info ? '<span class="chat-msg-reaction">' + info.emoji + (count > 1 ? count : '') + '</span>' : '';
+            return info ? `<span class="chat-msg-reaction">${info.emoji}${count > 1 ? count : ''}</span>` : '';
         }).join('');
-        reactionsHtml = '<div class="chat-msg-reactions">' + badges + '</div>';
+        reactionsHtml = `<div class="chat-msg-reactions">${badges}</div>`;
     }
 
-    return '<div class="chat-msg ' + cls + '" data-msg-id="' + msg.id + '" data-msg-author="' + msg.author + '"><div class="chat-bubble">' + replyHtml + contentHtml + '<div class="chat-msg-meta"><span class="chat-msg-time">' + time + '</span>' + readHtml + '</div></div>' + reactionsHtml + '</div>';
+    return `<div class="chat-msg ${cls}" data-msg-id="${msg.id}" data-msg-author="${msg.author}">
+        <div class="chat-bubble">${replyHtml}${contentHtml}
+        <div class="chat-msg-meta"><span class="chat-msg-time">${time}</span>${readHtml}</div></div>
+        ${reactionsHtml}</div>`;
 }
 
 function renderVoiceMessage(voiceData, isMine, msgId) {
     const bars = Array.from({length: 20}, () => {
         const h = Math.random() * 16 + 4;
-        return '<div class="chat-voice-bar" style="height:' + h + 'px"></div>';
+        return `<div class="chat-voice-bar" style="height:${h}px"></div>`;
     }).join('');
-    return '<div class="chat-voice-msg"><button class="chat-voice-play" onclick="playVoiceMessage(\'' + msgId + '\')"><i class="fas fa-play"></i></button><div class="chat-voice-wave">' + bars + '</div></div>';
+    return `<div class="chat-voice-msg">
+        <button class="chat-voice-play" onclick="playVoiceMessage('${msgId}')"><i class="fas fa-play"></i></button>
+        <div class="chat-voice-wave">${bars}</div>
+    </div>`;
 }
 
 function playVoiceMessage(msgId) {
@@ -1977,60 +2135,37 @@ function playVoiceMessage(msgId) {
 
 function bindChatMessageEvents() {
     const container = document.getElementById('chatMessages');
+    // Long-press for context menu
     container.querySelectorAll('.chat-msg').forEach(el => {
         const msgId = el.dataset.msgId;
-        let longPressTimer = null;
-        let hasMoved = false;
-        let startX = 0;
-        let startY = 0;
-
-        // Touch (mobile) - long press for context menu
-        el.addEventListener('touchstart', (e) => {
-            hasMoved = false;
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            longPressTimer = setTimeout(() => {
-                if (!hasMoved) {
-                    selectedChatMsgId = msgId;
-                    showChatContextMenuAtPoint(startX, startY, msgId);
-                }
-            }, 500);
-        }, { passive: true });
-
-        el.addEventListener('touchmove', (e) => {
-            const touch = e.touches[0];
-            const dx = Math.abs(touch.clientX - startX);
-            const dy = Math.abs(touch.clientY - startY);
-            if (dx > 10 || dy > 10) {
-                hasMoved = true;
-                clearTimeout(longPressTimer);
-            }
-        }, { passive: true });
-
-        el.addEventListener('touchend', () => {
-            clearTimeout(longPressTimer);
-        }, { passive: true });
-
-        el.addEventListener('touchcancel', () => {
-            clearTimeout(longPressTimer);
-        }, { passive: true });
-
-        // Mouse (desktop) - right-click for context menu
-        el.addEventListener('contextmenu', (e) => {
+        let timer = null;
+        const startPress = (e) => {
             e.preventDefault();
-            selectedChatMsgId = msgId;
-            showChatContextMenuAtPoint(e.clientX, e.clientY, msgId);
-        });
+            timer = setTimeout(() => {
+                selectedChatMsgId = msgId;
+                showChatContextMenu(e, msgId);
+            }, 500);
+        };
+        const endPress = () => { clearTimeout(timer); };
+        el.addEventListener('touchstart', startPress, { passive: false });
+        el.addEventListener('touchend', endPress);
+        el.addEventListener('touchmove', endPress);
+        el.addEventListener('mousedown', startPress);
+        el.addEventListener('mouseup', endPress);
+        el.addEventListener('mouseleave', endPress);
     });
 }
 
-function showChatContextMenuAtPoint(x, y, msgId) {
+function showChatContextMenu(e, msgId) {
     const menu = document.getElementById('chatContextMenu');
     const msg = allChatMessages.find(m => m.id === msgId);
     if (!msg) return;
 
-    // Position menu
+    // Position
+    let x, y;
+    if (e.touches) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+    else { x = e.clientX; y = e.clientY; }
+
     menu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
     menu.style.top = Math.max(60, y - 120) + 'px';
     menu.style.display = 'block';
@@ -2039,7 +2174,7 @@ function showChatContextMenuAtPoint(x, y, msgId) {
     const deleteBtn = document.getElementById('ctxDeleteBtn');
     deleteBtn.style.display = msg.author === currentUser ? 'flex' : 'none';
 
-    // Vibrate on mobile
+    // Vibrate
     if (navigator.vibrate) navigator.vibrate(30);
 }
 
@@ -2047,6 +2182,7 @@ function showChatContextMenuAtPoint(x, y, msgId) {
 async function sendChatMessage() {
     const input = document.getElementById('chatInput');
     const rawText = input.value.trim();
+    if (!rawText && !replyingTo) return;
     if (!rawText) return;
 
     try {
@@ -2061,6 +2197,7 @@ async function sendChatMessage() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
+        // Reply
         if (replyingTo) {
             const replyMsg = allChatMessages.find(m => m.id === replyingTo);
             if (replyMsg) {
@@ -2148,7 +2285,7 @@ function startVoiceRecording() {
                 voiceRecordingSeconds++;
                 const m = Math.floor(voiceRecordingSeconds / 60);
                 const s = voiceRecordingSeconds % 60;
-                document.getElementById('voiceRecTime').textContent = m + ':' + String(s).padStart(2, '0');
+                document.getElementById('voiceRecTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
             }, 1000);
         }).catch(e => { showToast('Microphone access denied'); });
     } catch (e) { showToast('Recording not supported'); }
@@ -2187,11 +2324,11 @@ function handleChatTyping() {
 }
 
 // ---- Online Status ----
-function updateOnlineStatus(online) {
+function updateOnlineStatus(isOnline) {
     if (!fdb || !currentUser) return;
     const key = currentUser.toLowerCase();
     fdb.collection(CHAT_META_COLLECTION).doc('status').set({
-        [key]: { isOnline: online, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }
+        [key]: { isOnline, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }
     }, { merge: true }).catch(e => console.error('Online status failed:', e));
 }
 
@@ -2203,13 +2340,14 @@ async function markMessagesAsRead() {
             .where('author', '!=', currentUser)
             .where('deleted', '==', false)
             .limit(50).get();
+
         const batch = fdb.batch();
         let count = 0;
         snapshot.forEach(doc => {
             const data = doc.data();
             const readBy = data.readBy || {};
             if (!readBy[currentUser.toLowerCase()]) {
-                batch.update(doc.ref, { ['readBy.' + currentUser.toLowerCase()]: true });
+                batch.update(doc.ref, { [`readBy.${currentUser.toLowerCase()}`]: true });
                 count++;
             }
         });
@@ -2221,10 +2359,8 @@ async function markMessagesAsRead() {
 async function addChatReaction(msgId, reactionType) {
     try {
         const userKey = currentUser.toLowerCase();
-        // Encrypt the reaction type
-        const encReaction = isEncryptionSetup ? await encryptText(reactionType) : reactionType;
         await fdb.collection(MESSAGES_COLLECTION).doc(msgId).update({
-            ['reactions.' + userKey]: encReaction
+            [`reactions.${userKey}`]: reactionType
         });
     } catch (e) { console.error('Chat reaction failed:', e); }
 }
@@ -2239,6 +2375,7 @@ function replyToMessage(msgId) {
     document.getElementById('chatReplyText').textContent = (msg.text || (msg.imageData ? '📷 Photo' : (msg.voiceData ? '🎙️ Voice message' : ''))).substring(0, 60);
     preview.style.display = 'flex';
     document.getElementById('chatInput').focus();
+    // Close context menu
     document.getElementById('chatContextMenu').style.display = 'none';
 }
 
@@ -2277,13 +2414,16 @@ function searchChatMessages(query) {
     }
     container.innerHTML = results.slice(0, 20).map(m => {
         const time = formatChatTime(m.createdAt);
-        return '<div class="chat-search-result" onclick="scrollToMessage(\'' + m.id + '\')"><div class="chat-search-result-author">' + (m.author || '?') + '</div><div class="chat-search-result-text">' + escapeHtml((m.text || '').substring(0, 80)) + '</div><div class="chat-search-result-time">' + time + '</div></div>';
+        return `<div class="chat-search-result" onclick="scrollToMessage('${m.id}')">
+            <div class="chat-search-result-author">${m.author || '?'}</div>
+            <div class="chat-search-result-text">${escapeHtml((m.text || '').substring(0, 80))}</div>
+            <div class="chat-search-result-time">${time}</div></div>`;
     }).join('');
 }
 
 function scrollToMessage(msgId) {
     closeChatSearch();
-    const el = document.querySelector('.chat-msg[data-msg-id="' + msgId + '"]');
+    const el = document.querySelector(`.chat-msg[data-msg-id="${msgId}"]`);
     if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         el.style.background = 'var(--primary-light)';
@@ -2345,10 +2485,28 @@ function renderLetters(letters) {
     list.innerHTML = letters.map(l => {
         const dateStr = l.createdAt ? (l.createdAt.toDate ? l.createdAt.toDate() : new Date(l.createdAt)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
         if (l.openedBy) {
-            return '<div class="letter-card letter-card-opened" onclick="viewLetter(\'' + l.id + '\')"><div class="letter-card-top"><div class="letter-open-icon">💌</div><div class="letter-card-info"><div class="letter-card-label">Opened Letter</div><div class="letter-card-date">' + dateStr + '</div><div class="letter-card-author">From ' + (l.author || '?') + '</div></div><div class="letter-card-badge"><i class="fas fa-envelope-open"></i></div></div></div>';
+            return `<div class="letter-card letter-card-opened" onclick="viewLetter('${l.id}')">
+                <div class="letter-card-top">
+                    <div class="letter-open-icon">💌</div>
+                    <div class="letter-card-info">
+                        <div class="letter-card-label">Opened Letter</div>
+                        <div class="letter-card-date">${dateStr}</div>
+                        <div class="letter-card-author">From ${l.author || '?'}</div>
+                    </div>
+                    <div class="letter-card-badge"><i class="fas fa-envelope-open"></i></div>
+                </div></div>`;
         } else {
             const isForMe = l.author !== currentUser;
-            return '<div class="letter-card letter-card-sealed" ' + (isForMe ? 'onclick="openLetter(\'' + l.id + '\')"' : '') + '><div class="letter-card-top"><div class="letter-seal-icon"><i class="fas fa-envelope"></i></div><div class="letter-card-info"><div class="letter-card-label">' + (isForMe ? 'New Letter!' : 'Sealed Letter') + '</div><div class="letter-card-date">' + dateStr + '</div><div class="letter-card-author">From ' + (l.author || '?') + '</div></div><div class="letter-card-badge">' + (isForMe ? '✨' : '<i class="fas fa-lock"></i>') + '</div></div></div>';
+            return `<div class="letter-card letter-card-sealed" ${isForMe ? `onclick="openLetter('${l.id}')"` : ''}>
+                <div class="letter-card-top">
+                    <div class="letter-seal-icon"><i class="fas fa-envelope"></i></div>
+                    <div class="letter-card-info">
+                        <div class="letter-card-label">${isForMe ? 'New Letter!' : 'Sealed Letter'}</div>
+                        <div class="letter-card-date">${dateStr}</div>
+                        <div class="letter-card-author">From ${l.author || '?'}</div>
+                    </div>
+                    <div class="letter-card-badge">${isForMe ? '✨' : '<i class="fas fa-lock"></i>'}</div>
+                </div></div>`;
         }
     }).join('');
 }
@@ -2393,7 +2551,7 @@ async function createLetter() {
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         closeLetterCreateModal();
-        showToast('Love letter sent!');
+        showToast('Love letter sent! 💌');
     } catch (e) { console.error('Create letter failed:', e); showToast('Failed to send letter'); }
 }
 
@@ -2416,8 +2574,13 @@ async function viewLetter(letterId) {
             data.text = await decryptField(data.text, doc.id, 'text');
             if (data.imageData) data.imageData = await decryptField(data.imageData, doc.id, 'imageData');
         }
-        let imgHtml = data.imageData ? '<img class="letter-view-img" src="' + data.imageData + '" alt="" onclick="openImageViewer(this.src)">' : '';
-        document.getElementById('letterViewContent').innerHTML = '<div class="letter-view-meta"><div class="letter-view-author">From ' + (data.author || '?') + '</div></div>' + imgHtml + '<div class="letter-view-text">' + escapeHtml(data.text || '') + '</div>';
+        let imgHtml = data.imageData ? `<img class="letter-view-img" src="${data.imageData}" alt="" onclick="openImageViewer('${data.imageData.replace(/'/g, "\\'")}')">` : '';
+        document.getElementById('letterViewContent').innerHTML = `
+            <div class="letter-view-meta">
+                <div class="letter-view-author">From ${data.author || '?'}</div>
+            </div>
+            ${imgHtml}
+            <div class="letter-view-text">${escapeHtml(data.text || '')}</div>`;
         document.getElementById('letterViewModal').style.display = 'flex';
     } catch (e) { console.error('View letter failed:', e); }
 }
@@ -2464,14 +2627,25 @@ function renderMoodTracker() {
 
     emptyEl.style.display = 'none';
     canvas.style.display = 'block';
+
+    // Simple chart drawing
     drawMoodChart(canvas);
 
+    // History list
     if (historyList) {
         historyList.innerHTML = allMoodHistoryCache.slice(0, 15).map(h => {
             const lower = (h.user || 'a').toLowerCase();
             const moodInfo = MOOD_MAP[h.mood] || { emoji: '😊', text: h.mood };
             const time = timeAgo(h.createdAt);
-            return '<div class="mood-history-item"><div class="mood-history-avatar user-' + lower + '">' + (h.user || '?').toUpperCase() + '</div><span class="mood-history-emoji">' + moodInfo.emoji + '</span><div class="mood-history-info"><div class="mood-history-mood">' + moodInfo.text + '</div>' + (h.customText ? '<div class="mood-history-custom">' + escapeHtml(h.customText) + '</div>' : '') + '</div><span class="mood-history-time">' + time + '</span></div>';
+            return `<div class="mood-history-item">
+                <div class="mood-history-avatar user-${lower}">${(h.user || '?').toUpperCase()}</div>
+                <span class="mood-history-emoji">${moodInfo.emoji}</span>
+                <div class="mood-history-info">
+                    <div class="mood-history-mood">${moodInfo.text}</div>
+                    ${h.customText ? `<div class="mood-history-custom">${escapeHtml(h.customText)}</div>` : ''}
+                </div>
+                <span class="mood-history-time">${time}</span>
+            </div>`;
         }).join('');
     }
 }
@@ -2485,10 +2659,12 @@ function drawMoodChart(canvas) {
     canvas.style.width = rect.width + 'px';
     canvas.style.height = '200px';
     ctx.scale(dpr, dpr);
+
     const w = rect.width;
     const h = 200;
     ctx.clearRect(0, 0, w, h);
 
+    // Get last 14 days of mood data per user
     const aMoods = allMoodHistoryCache.filter(m => m.user === 'A').reverse().slice(-14);
     const pMoods = allMoodHistoryCache.filter(m => m.user === 'P').reverse().slice(-14);
 
@@ -2496,6 +2672,7 @@ function drawMoodChart(canvas) {
     const chartW = w - padding.left - padding.right;
     const chartH = h - padding.top - padding.bottom;
 
+    // Grid lines
     ctx.strokeStyle = '#F5EDEB';
     ctx.lineWidth = 1;
     for (let i = 1; i <= 8; i++) {
@@ -2503,6 +2680,7 @@ function drawMoodChart(canvas) {
         ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
     }
 
+    // Draw line
     function drawLine(moods, color) {
         if (moods.length < 2) return;
         ctx.strokeStyle = color;
@@ -2510,15 +2688,17 @@ function drawMoodChart(canvas) {
         ctx.lineJoin = 'round';
         ctx.beginPath();
         moods.forEach((m, i) => {
-            const x = padding.left + (i / Math.max(moods.length - 1, 1)) * chartW;
+            const x = padding.left + (i / (Math.max(moods.length - 1, 1))) * chartW;
             const val = MOOD_VALUES[m.mood] || 5;
             const y = padding.top + chartH - (val / 8) * chartH;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         });
         ctx.stroke();
+
+        // Dots
         moods.forEach((m, i) => {
-            const x = padding.left + (i / Math.max(moods.length - 1, 1)) * chartW;
+            const x = padding.left + (i / (Math.max(moods.length - 1, 1))) * chartW;
             const val = MOOD_VALUES[m.mood] || 5;
             const y = padding.top + chartH - (val / 8) * chartH;
             ctx.fillStyle = color;
@@ -2529,6 +2709,10 @@ function drawMoodChart(canvas) {
     drawLine(aMoods, '#FF6B8A');
     drawLine(pMoods, '#8BC4A3');
 }
+
+// Also log mood to history when setting mood
+const _origSetMood = typeof setMood === 'function' ? setMood : null;
+// We'll override setMood after it's defined
 
 // ============ STREAK COUNTER ============
 
@@ -2547,14 +2731,18 @@ function loadStreak() {
 function renderStreak(data) {
     const days = data.days || 0;
     const best = data.bestStreak || 0;
+
     document.getElementById('streakNumber').textContent = days;
     document.getElementById('streakBest').textContent = best;
+
     const sublabel = document.getElementById('streakSublabel');
     if (days === 0) sublabel.textContent = 'Post daily to start your streak!';
     else if (days === 1) sublabel.textContent = 'Great start! Keep it going!';
-    else if (days < 7) sublabel.textContent = days + ' days strong! Don\'t break it!';
-    else if (days < 30) sublabel.textContent = days + ' days! You\'re on fire!';
-    else sublabel.textContent = days + ' days! Legendary couple!';
+    else if (days < 7) sublabel.textContent = `${days} days strong! Don't break it!`;
+    else if (days < 30) sublabel.textContent = `${days} days! You're on fire!`;
+    else sublabel.textContent = `${days} days! Legendary couple!`;
+
+    // Calendar
     renderStreakCalendar(data);
 }
 
@@ -2567,31 +2755,39 @@ function renderStreakCalendar(data) {
         if (d.toDate) return d.toDate().toISOString().split('T')[0];
         return new Date(d).toISOString().split('T')[0];
     }));
+
+    // Get current month
     const year = now.getFullYear();
     const month = now.getMonth();
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = now.getDate();
+
     const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    let html = dayNames.map(d => '<div class="streak-cal-day header">' + d + '</div>').join('');
+    let html = dayNames.map(d => `<div class="streak-cal-day header">${d}</div>`).join('');
+
     for (let i = 0; i < firstDay; i++) html += '<div class="streak-cal-day"></div>';
+
     for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const isStreak = historySet.has(dateStr);
         const isToday = d === today;
         let cls = 'streak-cal-day';
         if (isStreak) cls += ' streak-day';
         if (isToday) cls += ' today';
-        html += '<div class="' + cls + '">' + d + '</div>';
+        html += `<div class="${cls}">${d}</div>`;
     }
+
     cal.innerHTML = html;
 }
 
+// Check and update streak when posting
 async function updateStreakOnPost() {
     if (!fdb || !currentUser) return;
     try {
         const today = new Date().toISOString().split('T')[0];
         const doc = await fdb.collection(STREAKS_COLLECTION).doc('current').get();
+
         if (!doc.exists) {
             await fdb.collection(STREAKS_COLLECTION).doc('current').set({
                 days: 1, bestStreak: 1, lastPostDate: today,
@@ -2599,19 +2795,24 @@ async function updateStreakOnPost() {
             });
             return;
         }
+
         const data = doc.data();
         const lastPost = data.lastPostDate;
-        if (lastPost === today) return;
+
+        if (lastPost === today) return; // Already posted today
+
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
         let newDays;
         if (lastPost === yesterday) {
             newDays = (data.days || 0) + 1;
         } else {
-            newDays = 1;
+            newDays = 1; // Streak broken
         }
+
         const newBest = Math.max(newDays, data.bestStreak || 0);
         const history = data.history || [];
         if (!history.includes(today)) history.push(today);
+
         await fdb.collection(STREAKS_COLLECTION).doc('current').set({
             days: newDays, bestStreak: newBest, lastPostDate: today,
             history, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -2631,6 +2832,7 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(reg => {
             console.log('SW registered');
+            // Check for updates every 30 minutes
             setInterval(() => reg.update(), 30 * 60 * 1000);
         }).catch(e => {
             console.warn('SW registration failed:', e);
