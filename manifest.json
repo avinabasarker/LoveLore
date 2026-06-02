@@ -1,7 +1,7 @@
 {
     "name": "LoveLore",
     "short_name": "LoveLore",
-    "description": "❤️",
+    "description": ":)",
     "start_url": "./index.html",
     "display": "standalone",
     "orientation": "portrait",
