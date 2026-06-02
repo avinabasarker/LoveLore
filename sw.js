@@ -3,8 +3,8 @@
    Offline-first with smart caching
    ============================================ */
 
-const CACHE_NAME = 'lovelore-v5';
-const RUNTIME_CACHE = 'lovelore-runtime-v5';
+const CACHE_NAME = 'lovelore-v6';
+const RUNTIME_CACHE = 'lovelore-runtime-v6';
 
 // Core app files to pre-cache on install
 const APP_SHELL = [
