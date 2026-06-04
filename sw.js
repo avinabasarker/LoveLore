@@ -1,10 +1,10 @@
 /* ============================================
-   LoveLore Social — Service Worker v3
-   Offline-first with smart caching
+   LoveLore Social — Service Worker v4
+   Network-first for instant updates
    ============================================ */
 
-const CACHE_NAME = 'lovelore-v5';
-const RUNTIME_CACHE = 'lovelore-runtime-v5';
+const CACHE_NAME = 'lovelore-v6';
+const RUNTIME_CACHE = 'lovelore-runtime-v6';
 
 // Core app files to pre-cache on install
 const APP_SHELL = [
@@ -37,7 +37,7 @@ self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// Activate — clean old caches
+// Activate — clean ALL old caches aggressively
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => {
@@ -45,12 +45,16 @@ self.addEventListener('activate', (event) => {
                 keys.filter((key) => key !== CACHE_NAME && key !== RUNTIME_CACHE)
                     .map((key) => caches.delete(key))
             );
+        }).then(() => self.clients.claim()).then(() => {
+            // Notify all clients that a new version is active
+            return self.clients.matchAll().then(clients => {
+                clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }));
+            });
         })
     );
-    self.clients.claim();
 });
 
-// Fetch — smart caching strategy
+// Fetch — network-first for app files, cache for external
 self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
@@ -64,14 +68,14 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // App shell files — cache-first (instant load)
+    // App shell files — NETWORK-FIRST (always check for updates)
     if (event.request.url.startsWith(self.location.origin) &&
         (url.pathname.endsWith('.html') ||
          url.pathname.endsWith('.css') ||
          url.pathname.endsWith('.js') ||
          url.pathname.endsWith('.json') ||
          url.pathname.endsWith('.png'))) {
-        event.respondWith(cacheFirst(event.request));
+        event.respondWith(networkFirstWithUpdate(event.request));
         return;
     }
 
@@ -85,10 +89,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(networkFirst(event.request));
 });
 
-// Cache-first: return cache if available, else fetch
-async function cacheFirst(request) {
-    const cached = await caches.match(request);
-    if (cached) return cached;
+// Network-first with background cache update: try network, fall back to cache
+async function networkFirstWithUpdate(request) {
     try {
         const response = await fetch(request);
         if (response.ok) {
@@ -97,7 +99,8 @@ async function cacheFirst(request) {
         }
         return response;
     } catch (e) {
-        // If it's a navigation request, serve index.html
+        const cached = await caches.match(request);
+        if (cached) return cached;
         if (request.mode === 'navigate') {
             return caches.match('./index.html');
         }
