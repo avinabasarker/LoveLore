@@ -1988,7 +1988,7 @@ function attachChatMetaListener() {
             const partner = currentUser === 'A' ? 'p' : 'a';
             const partnerUpper = partner.toUpperCase();
 
-            // Update partner online status
+            // Update partner online status with heartbeat check
             const avatar = document.getElementById('chatPartnerAvatar');
             const statusEl = document.getElementById('chatPartnerStatus');
             if (avatar) {
@@ -1997,7 +1997,18 @@ function attachChatMetaListener() {
                 // Remove existing dot
                 const existingDot = avatar.querySelector('.online-dot');
                 if (existingDot) existingDot.remove();
+
+                // Determine if partner is truly online
+                let partnerIsOnline = false;
                 if (data[partner] && data[partner].isOnline) {
+                    // Check heartbeat: if lastSeen is older than 90s, they're actually offline
+                    const ls = data[partner].lastSeen ? (data[partner].lastSeen.toDate ? data[partner].lastSeen.toDate() : new Date(data[partner].lastSeen)) : null;
+                    if (ls && (Date.now() - ls.getTime() < 90000)) {
+                        partnerIsOnline = true;
+                    }
+                }
+
+                if (partnerIsOnline) {
                     const dot = document.createElement('div');
                     dot.className = 'online-dot online';
                     avatar.appendChild(dot);
@@ -2381,12 +2392,41 @@ function handleChatTyping() {
 }
 
 // ---- Online Status ----
+// Uses a heartbeat system: each online user writes a timestamp every 30s.
+// If the timestamp is older than 90s, they are considered offline.
+let heartbeatInterval = null;
+
 function updateOnlineStatus(isOnline) {
     if (!fdb || !currentUser) return;
     const key = currentUser.toLowerCase();
     fdb.collection(CHAT_META_COLLECTION).doc('status').set({
         [key]: { isOnline, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }
     }, { merge: true }).catch(e => console.error('Online status failed:', e));
+
+    // Start/stop heartbeat
+    if (isOnline) {
+        startHeartbeat();
+    } else {
+        stopHeartbeat();
+    }
+}
+
+function startHeartbeat() {
+    if (heartbeatInterval) return; // Already running
+    heartbeatInterval = setInterval(() => {
+        if (!fdb || !currentUser) { stopHeartbeat(); return; }
+        const key = currentUser.toLowerCase();
+        fdb.collection(CHAT_META_COLLECTION).doc('status').set({
+            [key]: { isOnline: true, lastSeen: firebase.firestore.FieldValue.serverTimestamp() }
+        }, { merge: true }).catch(e => console.error('Heartbeat failed:', e));
+    }, 30000); // Every 30 seconds
+}
+
+function stopHeartbeat() {
+    if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+    }
 }
 
 // ---- Read Receipts ----
@@ -2885,10 +2925,23 @@ async function updateStreakOnPost() {
     } catch (e) { console.error('Update streak failed:', e); }
 }
 
-// Online status on tab close/hide
-window.addEventListener('beforeunload', () => updateOnlineStatus(false));
+// Online status on tab close/hide — multiple fallbacks for mobile reliability
+window.addEventListener('beforeunload', () => {
+    updateOnlineStatus(false);
+});
 document.addEventListener('visibilitychange', () => {
     if (currentUser) updateOnlineStatus(!document.hidden);
+});
+// Also handle pagehide (more reliable on mobile than beforeunload)
+window.addEventListener('pagehide', () => {
+    updateOnlineStatus(false);
+});
+// Freeze/resume events for mobile PWA
+document.addEventListener('freeze', () => {
+    updateOnlineStatus(false);
+});
+document.addEventListener('resume', () => {
+    if (currentUser) updateOnlineStatus(true);
 });
 
 // ============ SERVICE WORKER REGISTRATION ============
