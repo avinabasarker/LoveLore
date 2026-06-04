@@ -314,7 +314,36 @@ document.addEventListener('DOMContentLoaded', () => {
     initFirebase();
     checkSession();
     setupEventListeners();
+    setupAutoUpdate();
 });
+
+// ---- Auto Update: Listen for service worker updates ----
+function setupAutoUpdate() {
+    // When SW detects a new version, auto-reload to apply it
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'SW_UPDATED') {
+                console.log('New version available, reloading...');
+                // Only reload if user is not typing (don't interrupt)
+                const activeEl = document.activeElement;
+                const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+                if (!isTyping) {
+                    window.location.reload();
+                } else {
+                    // Show a subtle toast instead
+                    showToast('Update available — refresh to get the latest version');
+                }
+            }
+        });
+
+        // Also check for SW updates every 30 minutes
+        setInterval(() => {
+            if (navigator.serviceWorker.controller) {
+                navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
+            }
+        }, 30 * 60 * 1000);
+    }
+}
 
 function initFirebase() {
     try {
