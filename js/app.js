@@ -273,7 +273,14 @@ async function encryptText(plaintext) {
         const combined = new Uint8Array(iv.length + ciphertext.byteLength);
         combined.set(iv);
         combined.set(new Uint8Array(ciphertext), iv.length);
-        return 'ENC:' + btoa(String.fromCharCode(...combined));
+        // Chunked base64 encoding — avoids call stack overflow on large data (voice, images)
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < combined.length; i += chunkSize) {
+            const chunk = combined.subarray(i, Math.min(i + chunkSize, combined.length));
+            binary += String.fromCharCode.apply(null, chunk);
+        }
+        return 'ENC:' + btoa(binary);
     } catch (e) { console.error('Encrypt failed:', e); return plaintext; }
 }
 
@@ -281,7 +288,12 @@ async function decryptText(ciphertext) {
     if (!ciphertext || !ciphertext.startsWith('ENC:')) return ciphertext;
     try {
         const raw = atob(ciphertext.substring(4));
-        const combined = Uint8Array.from(raw, c => c.charCodeAt(0));
+        // Efficient binary string → Uint8Array conversion for large data
+        const len = raw.length;
+        const combined = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            combined[i] = raw.charCodeAt(i);
+        }
         const iv = combined.slice(0, 12);
         const data = combined.slice(12);
         const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, encryptionKey, data);
@@ -294,7 +306,7 @@ async function decryptField(ciphertext, docId, field) {
     const cacheKey = `${docId}:${field}`;
     if (_decryptCache.has(cacheKey)) return _decryptCache.get(cacheKey);
     const result = await decryptText(ciphertext);
-    if (_decryptCache.size > 100) { const k = _decryptCache.keys().next().value; _decryptCache.delete(k); }
+    if (_decryptCache.size > 200) { const k = _decryptCache.keys().next().value; _decryptCache.delete(k); }
     _decryptCache.set(cacheKey, result);
     return result;
 }
@@ -1906,6 +1918,13 @@ function switchScreen(screenId) {
     } else {
         if (topBar) topBar.style.display = 'flex';
         if (bottomNav) bottomNav.classList.remove('chat-hidden');
+        // Stop voice playback when leaving chat
+        if (_currentVoiceAudio) {
+            _currentVoiceAudio.pause();
+            _currentVoiceAudio = null;
+            _currentVoiceMsgId = null;
+            clearInterval(_voicePlayInterval);
+        }
     }
 }
 
@@ -2166,29 +2185,141 @@ function renderVoiceMessage(voiceData, isMine, msgId) {
         const h = Math.random() * 16 + 4;
         return `<div class="chat-voice-bar" style="height:${h}px"></div>`;
     }).join('');
-    return `<div class="chat-voice-msg">
-        <button class="chat-voice-play" onclick="playVoiceMessage('${msgId}')"><i class="fas fa-play"></i></button>
+    // Use data-action attribute instead of inline onclick for reliability
+    return `<div class="chat-voice-msg" data-voice-id="${msgId}">
+        <button class="chat-voice-play" data-action="play-voice" data-voice-id="${msgId}"><i class="fas fa-play"></i></button>
         <div class="chat-voice-wave">${bars}</div>
+        <span class="chat-voice-duration">0:00</span>
     </div>`;
 }
 
+// Track currently playing audio so we can stop/restart
+let _currentVoiceAudio = null;
+let _currentVoiceMsgId = null;
+let _voicePlayInterval = null;
+
 function playVoiceMessage(msgId) {
     const msg = allChatMessages.find(m => m.id === msgId);
-    if (!msg || !msg.voiceData) return;
+    if (!msg || !msg.voiceData) { console.warn('No voice data for msg:', msgId); return; }
+
+    // If this message is already playing, pause it
+    if (_currentVoiceAudio && _currentVoiceMsgId === msgId) {
+        _currentVoiceAudio.pause();
+        _currentVoiceAudio.currentTime = 0;
+        stopVoicePlayUI(msgId);
+        _currentVoiceAudio = null;
+        _currentVoiceMsgId = null;
+        return;
+    }
+
+    // Stop any previously playing voice
+    if (_currentVoiceAudio) {
+        _currentVoiceAudio.pause();
+        _currentVoiceAudio.currentTime = 0;
+        stopVoicePlayUI(_currentVoiceMsgId);
+    }
+
     try {
-        const audio = new Audio(msg.voiceData);
-        audio.play().catch(e => console.error('Voice play failed:', e));
-    } catch(e) { console.error('Voice play error:', e); }
+        let audioSrc = msg.voiceData;
+
+        // If decryption returned the raw ENC: string, it means decryption failed
+        if (typeof audioSrc === 'string' && audioSrc.startsWith('ENC:')) {
+            console.error('Voice data is still encrypted — decryption failed');
+            showToast('Cannot play voice message');
+            return;
+        }
+
+        // Ensure it's a proper data URL for Audio
+        if (audioSrc && !audioSrc.startsWith('data:') && !audioSrc.startsWith('blob:')) {
+            // Fallback: treat as raw base64
+            audioSrc = 'data:audio/webm;base64,' + audioSrc;
+        }
+
+        const audio = new Audio(audioSrc);
+        _currentVoiceAudio = audio;
+        _currentVoiceMsgId = msgId;
+
+        audio.onplay = () => {
+            startVoicePlayUI(msgId, audio);
+        };
+        audio.onended = () => {
+            stopVoicePlayUI(msgId);
+            _currentVoiceAudio = null;
+            _currentVoiceMsgId = null;
+        };
+        audio.onerror = (e) => {
+            console.error('Audio error:', e);
+            stopVoicePlayUI(msgId);
+            _currentVoiceAudio = null;
+            _currentVoiceMsgId = null;
+            showToast('Cannot play this voice message');
+        };
+
+        audio.play().catch(e => {
+            console.error('Voice play failed:', e);
+            showToast('Cannot play voice message');
+            _currentVoiceAudio = null;
+            _currentVoiceMsgId = null;
+        });
+    } catch(e) {
+        console.error('Voice play error:', e);
+        showToast('Cannot play voice message');
+    }
+}
+
+function startVoicePlayUI(msgId, audio) {
+    const playBtn = document.querySelector(`[data-voice-id="${msgId}"] .chat-voice-play`);
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-pause"></i>';
+
+    // Update duration display
+    const durationEl = document.querySelector(`[data-voice-id="${msgId}"] .chat-voice-duration`);
+    clearInterval(_voicePlayInterval);
+    _voicePlayInterval = setInterval(() => {
+        if (audio && !audio.paused && durationEl) {
+            const current = audio.currentTime || 0;
+            const m = Math.floor(current / 60);
+            const s = Math.floor(current % 60);
+            durationEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+        }
+    }, 250);
+}
+
+function stopVoicePlayUI(msgId) {
+    clearInterval(_voicePlayInterval);
+    if (!msgId) return;
+    const playBtn = document.querySelector(`[data-voice-id="${msgId}"] .chat-voice-play`);
+    if (playBtn) playBtn.innerHTML = '<i class="fas fa-play"></i>';
+    const durationEl = document.querySelector(`[data-voice-id="${msgId}"] .chat-voice-duration`);
+    // Will update with final duration once metadata loads
 }
 
 function bindChatMessageEvents() {
     const container = document.getElementById('chatMessages');
-    // Long-press for context menu
+
+    // ---- Voice play button (event delegation) ----
+    container.addEventListener('click', e => {
+        const playBtn = e.target.closest('[data-action="play-voice"]');
+        if (playBtn) {
+            e.stopPropagation();
+            const voiceId = playBtn.dataset.voiceId;
+            if (voiceId) playVoiceMessage(voiceId);
+            return;
+        }
+    });
+
+    // ---- Per-message events: long-press + swipe-to-reply ----
     container.querySelectorAll('.chat-msg').forEach(el => {
         const msgId = el.dataset.msgId;
         let timer = null;
         let touchStartX = 0;
         let touchStartY = 0;
+
+        // ---- Swipe-to-reply state ----
+        let swipeStartX = 0;
+        let swipeStartY = 0;
+        let swipeActive = false;
+        let swipeMoved = false;
+
         const startPress = (e) => {
             // Store position for context menu positioning
             if (e.touches && e.touches.length > 0) {
@@ -2212,10 +2343,79 @@ function bindChatMessageEvents() {
                 if (dx > 10 || dy > 10) clearTimeout(timer);
             }
         };
+
+        // ---- Swipe-to-reply: touch handlers ----
+        const swipeTouchStart = (e) => {
+            if (e.touches.length !== 1) return;
+            swipeStartX = e.touches[0].clientX;
+            swipeStartY = e.touches[0].clientY;
+            swipeActive = false;
+            swipeMoved = false;
+            el.style.transition = 'none';
+        };
+
+        const swipeTouchMove = (e) => {
+            if (e.touches.length !== 1) return;
+            const dx = e.touches[0].clientX - swipeStartX;
+            const dy = e.touches[0].clientY - swipeStartY;
+
+            // Only activate swipe if horizontal movement dominates and direction is right
+            if (!swipeActive && Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy) * 1.5 && dx > 0) {
+                swipeActive = true;
+            }
+
+            if (swipeActive) {
+                const isMine = el.classList.contains('chat-msg-sent');
+                // For sent messages, swipe left; for received, swipe right
+                const offset = isMine ? Math.min(0, -Math.abs(dx)) : Math.min(Math.abs(dx), 80);
+                el.style.transform = `translateX(${offset}px)`;
+                // Show reply icon behind the bubble
+                if (!el.querySelector('.swipe-reply-icon')) {
+                    const icon = document.createElement('div');
+                    icon.className = 'swipe-reply-icon';
+                    icon.innerHTML = '<i class="fas fa-reply"></i>';
+                    if (isMine) {
+                        icon.style.left = '-40px';
+                    } else {
+                        icon.style.right = '-40px';
+                    }
+                    el.style.position = 'relative';
+                    el.appendChild(icon);
+                }
+                swipeMoved = true;
+            }
+        };
+
+        const swipeTouchEnd = (e) => {
+            el.style.transition = 'transform 0.2s ease-out';
+            el.style.transform = 'translateX(0)';
+
+            // Remove reply icon after animation
+            setTimeout(() => {
+                const icon = el.querySelector('.swipe-reply-icon');
+                if (icon) icon.remove();
+            }, 200);
+
+            // Trigger reply if swiped far enough
+            if (swipeActive && swipeMoved) {
+                const endTouch = e.changedTouches ? e.changedTouches[0] : e;
+                const dx = endTouch.clientX - swipeStartX;
+                const isMine = el.classList.contains('chat-msg-sent');
+                const threshold = 60;
+                // For received messages: swipe right → reply; for sent: swipe left → reply
+                if ((!isMine && dx > threshold) || (isMine && dx < -threshold)) {
+                    replyToMessage(msgId);
+                }
+            }
+
+            swipeActive = false;
+            swipeMoved = false;
+        };
+
         // Touch events - DO NOT call preventDefault on touchstart (that blocks scrolling!)
-        el.addEventListener('touchstart', startPress, { passive: true });
-        el.addEventListener('touchend', endPress);
-        el.addEventListener('touchmove', movePress, { passive: true });
+        el.addEventListener('touchstart', (e) => { startPress(e); swipeTouchStart(e); }, { passive: true });
+        el.addEventListener('touchend', (e) => { endPress(); swipeTouchEnd(e); });
+        el.addEventListener('touchmove', (e) => { movePress(e); swipeTouchMove(e); }, { passive: true });
         // Mouse events for desktop
         el.addEventListener('mousedown', startPress);
         el.addEventListener('mouseup', endPress);
@@ -2321,12 +2521,34 @@ async function sendChatImage(file) {
 function startVoiceRecording() {
     try {
         navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            // Pick the best supported MIME type (Safari doesn't support audio/webm)
+            let mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/webm';
+            }
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/ogg;codecs=opus';
+            }
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = 'audio/mp4';
+            }
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                mimeType = '';  // Let the browser decide
+            }
+
+            const options = mimeType ? { mimeType } : {};
+            mediaRecorder = new MediaRecorder(stream, options);
+            const actualMime = mediaRecorder.mimeType || 'audio/webm';
             voiceChunks = [];
             mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
             mediaRecorder.onstop = async () => {
                 stream.getTracks().forEach(t => t.stop());
-                const blob = new Blob(voiceChunks, { type: 'audio/webm' });
+                const blob = new Blob(voiceChunks, { type: actualMime });
+                // Check size limit (Firestore doc max ~1MB, keep voice under 700KB after encryption)
+                if (blob.size > 500000) {
+                    showToast('Voice message too long. Try under 60 seconds.');
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = async () => {
                     const base64 = reader.result;
@@ -2340,11 +2562,12 @@ function startVoiceRecording() {
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
                         showToast('Voice message sent!');
-                    } catch (e) { showToast('Failed to send voice'); }
+                    } catch (e) { console.error('Voice send failed:', e); showToast('Failed to send voice'); }
                 };
                 reader.readAsDataURL(blob);
             };
-            mediaRecorder.start();
+            // Request data every 5 seconds for better memory handling
+            mediaRecorder.start(5000);
             isRecordingVoice = true;
             voiceRecordingSeconds = 0;
             document.getElementById('chatVoiceOverlay').style.display = 'flex';
@@ -2354,9 +2577,13 @@ function startVoiceRecording() {
                 const m = Math.floor(voiceRecordingSeconds / 60);
                 const s = voiceRecordingSeconds % 60;
                 document.getElementById('voiceRecTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
+                // Auto-stop at 60 seconds
+                if (voiceRecordingSeconds >= 60) {
+                    stopVoiceRecording(true);
+                }
             }, 1000);
-        }).catch(e => { showToast('Microphone access denied'); });
-    } catch (e) { showToast('Recording not supported'); }
+        }).catch(e => { console.error('Mic access denied:', e); showToast('Microphone access denied'); });
+    } catch (e) { console.error('Recording not supported:', e); showToast('Recording not supported'); }
 }
 
 function stopVoiceRecording(send) {
@@ -2365,8 +2592,14 @@ function stopVoiceRecording(send) {
     isRecordingVoice = false;
     document.getElementById('chatVoiceOverlay').style.display = 'none';
     document.getElementById('chatInputBar').style.display = 'flex';
-    if (send) { mediaRecorder.stop(); }
-    else { mediaRecorder.stream.getTracks().forEach(t => t.stop()); mediaRecorder = null; }
+    if (send) {
+        try { mediaRecorder.stop(); } catch(e) { console.error('Stop recorder failed:', e); }
+    } else {
+        try {
+            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+        } catch(e) {}
+        mediaRecorder = null;
+    }
 }
 
 // ---- Typing Indicator ----
