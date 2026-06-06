@@ -939,7 +939,7 @@ html, body {
 }
 
 /* Message Bubble */
-.chat-msg { display: flex; margin-bottom: 4px; position: relative; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.chat-msg { display: flex; margin-bottom: 4px; position: relative; touch-action: pan-y; -webkit-user-select: none; user-select: none; overflow: hidden; will-change: transform; }
 .chat-msg-sent { justify-content: flex-end; }
 .chat-msg-received { justify-content: flex-start; }
 
@@ -998,7 +998,17 @@ html, body {
 }
 .chat-msg-sent .chat-voice-bar { background: rgba(255,255,255,0.5); }
 .chat-msg-received .chat-voice-bar { background: var(--border); }
-.chat-voice-duration { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
+.chat-voice-duration { font-size: 11px; opacity: 0.7; flex-shrink: 0; font-variant-numeric: tabular-nums; min-width: 28px; }
+
+/* Swipe-to-reply */
+.swipe-reply-icon {
+    position: absolute; top: 50%; left: -36px; transform: translateY(-50%);
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--primary); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; opacity: 0.8; pointer-events: none;
+    animation: fadeIn 0.15s ease-out;
+}
 
 /* Message Time + Read Receipt */
 .chat-msg-meta {
