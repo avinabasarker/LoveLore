@@ -273,32 +273,60 @@ async function encryptText(plaintext) {
         const combined = new Uint8Array(iv.length + ciphertext.byteLength);
         combined.set(iv);
         combined.set(new Uint8Array(ciphertext), iv.length);
-        // Chunked base64 encoding — avoids call stack overflow on large data (voice, images)
-        let binary = '';
-        const chunkSize = 8192;
-        for (let i = 0; i < combined.length; i += chunkSize) {
-            const chunk = combined.subarray(i, Math.min(i + chunkSize, combined.length));
-            binary += String.fromCharCode.apply(null, chunk);
-        }
-        return 'ENC:' + btoa(binary);
+        return 'ENC:' + uint8ToBase64(combined);
     } catch (e) { console.error('Encrypt failed:', e); return plaintext; }
 }
 
 async function decryptText(ciphertext) {
     if (!ciphertext || !ciphertext.startsWith('ENC:')) return ciphertext;
     try {
-        const raw = atob(ciphertext.substring(4));
-        // Efficient binary string → Uint8Array conversion for large data
-        const len = raw.length;
-        const combined = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            combined[i] = raw.charCodeAt(i);
-        }
+        const combined = base64ToUint8(ciphertext.substring(4));
         const iv = combined.slice(0, 12);
         const data = combined.slice(12);
         const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, encryptionKey, data);
         return new TextDecoder().decode(decrypted);
     } catch (e) { console.error('Decrypt failed:', e); return ciphertext; }
+}
+
+// Fast Uint8Array → base64 (handles large data without call stack overflow)
+function uint8ToBase64(bytes) {
+    const lookup = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let result = '';
+    const len = bytes.length;
+    for (let i = 0; i < len; i += 3) {
+        const a = bytes[i];
+        const b = i + 1 < len ? bytes[i + 1] : 0;
+        const c = i + 2 < len ? bytes[i + 2] : 0;
+        result += lookup[a >> 2] + lookup[((a & 3) << 4) | (b >> 4)];
+        result += (i + 1 < len) ? lookup[((b & 15) << 2) | (c >> 6)] : '=';
+        result += (i + 2 < len) ? lookup[c & 63] : '=';
+    }
+    return result;
+}
+
+// Fast base64 → Uint8Array (handles large data efficiently)
+function base64ToUint8(base64) {
+    const lookup = new Uint8Array(128);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    for (let i = 0; i < chars.length; i++) lookup[chars.charCodeAt(i)] = i;
+
+    const len = base64.length;
+    let byteLen = len * 3 / 4;
+    if (base64[len - 1] === '=') byteLen--;
+    if (base64[len - 2] === '=') byteLen--;
+
+    const bytes = new Uint8Array(byteLen);
+    let pos = 0;
+    for (let i = 0; i < len; i += 4) {
+        const a = lookup[base64.charCodeAt(i)];
+        const b = lookup[base64.charCodeAt(i + 1)];
+        const c = lookup[base64.charCodeAt(i + 2)];
+        const d = lookup[base64.charCodeAt(i + 3)];
+        bytes[pos++] = (a << 2) | (b >> 4);
+        if (pos < byteLen) bytes[pos++] = ((b & 15) << 4) | (c >> 2);
+        if (pos < byteLen) bytes[pos++] = ((c & 3) << 6) | d;
+    }
+    return bytes;
 }
 
 async function decryptField(ciphertext, docId, field) {
@@ -2229,13 +2257,14 @@ function playVoiceMessage(msgId) {
             return;
         }
 
-        // Ensure it's a proper data URL for Audio
-        if (audioSrc && !audioSrc.startsWith('data:') && !audioSrc.startsWith('blob:')) {
-            // Fallback: treat as raw base64
-            audioSrc = 'data:audio/webm;base64,' + audioSrc;
+        // Convert data URL to blob URL for reliable playback (large data URLs fail on mobile)
+        const blobUrl = dataUrlToBlobUrl(audioSrc);
+        if (!blobUrl) {
+            showToast('Cannot play voice message');
+            return;
         }
 
-        const audio = new Audio(audioSrc);
+        const audio = new Audio(blobUrl);
         _currentVoiceAudio = audio;
         _currentVoiceMsgId = msgId;
 
@@ -2264,6 +2293,45 @@ function playVoiceMessage(msgId) {
     } catch(e) {
         console.error('Voice play error:', e);
         showToast('Cannot play voice message');
+    }
+}
+
+// Convert data URL to blob URL — much more reliable for large audio on mobile
+function dataUrlToBlobUrl(dataUrl) {
+    try {
+        if (!dataUrl || typeof dataUrl !== 'string') return null;
+
+        // If it's already a blob URL, return as-is
+        if (dataUrl.startsWith('blob:')) return dataUrl;
+
+        // Must be a data URL
+        if (!dataUrl.startsWith('data:')) {
+            // Maybe it's raw base64 without the prefix
+            dataUrl = 'data:audio/webm;base64,' + dataUrl;
+        }
+
+        const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!match) {
+            console.error('Invalid data URL format');
+            return null;
+        }
+
+        const mimeType = match[1];
+        const base64 = match[2];
+
+        // Decode base64 to binary
+        const raw = atob(base64);
+        const len = raw.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = raw.charCodeAt(i);
+        }
+
+        const blob = new Blob([bytes], { type: mimeType });
+        return URL.createObjectURL(blob);
+    } catch (e) {
+        console.error('dataUrlToBlobUrl failed:', e);
+        return null;
     }
 }
 
@@ -2319,6 +2387,7 @@ function bindChatMessageEvents() {
         let swipeStartY = 0;
         let swipeActive = false;
         let swipeMoved = false;
+        let swipeDir = 0; // -1 = left, 1 = right
 
         const startPress = (e) => {
             // Store position for context menu positioning
@@ -2351,6 +2420,7 @@ function bindChatMessageEvents() {
             swipeStartY = e.touches[0].clientY;
             swipeActive = false;
             swipeMoved = false;
+            swipeDir = 0;
             el.style.transition = 'none';
         };
 
@@ -2359,27 +2429,29 @@ function bindChatMessageEvents() {
             const dx = e.touches[0].clientX - swipeStartX;
             const dy = e.touches[0].clientY - swipeStartY;
 
-            // Only activate swipe if horizontal movement dominates and direction is right
-            if (!swipeActive && Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy) * 1.5 && dx > 0) {
+            // Activate swipe on ANY horizontal direction (left or right)
+            if (!swipeActive && Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy) * 1.5) {
                 swipeActive = true;
+                swipeDir = dx > 0 ? 1 : -1;
             }
 
             if (swipeActive) {
-                const isMine = el.classList.contains('chat-msg-sent');
-                // For sent messages, swipe left; for received, swipe right
-                const offset = isMine ? Math.min(0, -Math.abs(dx)) : Math.min(Math.abs(dx), 80);
+                // Move bubble in the swipe direction, capped at 80px
+                const offset = swipeDir * Math.min(Math.abs(dx), 80);
                 el.style.transform = `translateX(${offset}px)`;
-                // Show reply icon behind the bubble
+                // Show reply icon on the opposite side of the swipe
                 if (!el.querySelector('.swipe-reply-icon')) {
                     const icon = document.createElement('div');
                     icon.className = 'swipe-reply-icon';
                     icon.innerHTML = '<i class="fas fa-reply"></i>';
-                    if (isMine) {
-                        icon.style.left = '-40px';
+                    // Icon appears on the side the bubble is moving away from
+                    if (swipeDir > 0) {
+                        icon.style.left = '-36px';
+                        icon.style.right = '';
                     } else {
-                        icon.style.right = '-40px';
+                        icon.style.right = '-36px';
+                        icon.style.left = '';
                     }
-                    el.style.position = 'relative';
                     el.appendChild(icon);
                 }
                 swipeMoved = true;
@@ -2399,17 +2471,15 @@ function bindChatMessageEvents() {
             // Trigger reply if swiped far enough
             if (swipeActive && swipeMoved) {
                 const endTouch = e.changedTouches ? e.changedTouches[0] : e;
-                const dx = endTouch.clientX - swipeStartX;
-                const isMine = el.classList.contains('chat-msg-sent');
-                const threshold = 60;
-                // For received messages: swipe right → reply; for sent: swipe left → reply
-                if ((!isMine && dx > threshold) || (isMine && dx < -threshold)) {
+                const totalDx = Math.abs(endTouch.clientX - swipeStartX);
+                if (totalDx > 60) {
                     replyToMessage(msgId);
                 }
             }
 
             swipeActive = false;
             swipeMoved = false;
+            swipeDir = 0;
         };
 
         // Touch events - DO NOT call preventDefault on touchstart (that blocks scrolling!)
@@ -2453,6 +2523,11 @@ async function sendChatMessage() {
     if (!rawText && !replyingTo) return;
     if (!rawText) return;
 
+    // Optimistic: clear input immediately so it feels instant
+    input.value = '';
+    updateChatSendBtn();
+    clearTypingStatus();
+
     try {
         const encText = isEncryptionSetup ? await encryptText(rawText) : rawText;
         const msgData = {
@@ -2477,12 +2552,12 @@ async function sendChatMessage() {
         }
 
         await fdb.collection(MESSAGES_COLLECTION).add(msgData);
-        input.value = '';
-        updateChatSendBtn();
-        clearTypingStatus();
     } catch (e) {
         console.error('Send message failed:', e);
         showToast('Failed to send');
+        // Restore input on failure
+        input.value = rawText;
+        updateChatSendBtn();
     }
 }
 
