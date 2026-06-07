@@ -2101,7 +2101,7 @@ function setPartnerTypingState(isTyping) {
     }
 }
 
-// ---- Render Chat Messages ----
+// ---- Render Chat Messages (Instagram-style with grouping) ----
 function renderChatMessages(messages) {
     const container = document.getElementById('chatMessages');
     const emptyEl = document.getElementById('chatEmpty');
@@ -2117,25 +2117,62 @@ function renderChatMessages(messages) {
 
     let html = '';
     let lastDate = null;
+    let prevMsg = null;
+    let prevMsgSameAuthor = false;
 
-    messages.forEach(msg => {
+    messages.forEach((msg, idx) => {
         const msgDate = msg.createdAt ? (msg.createdAt.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt)) : new Date();
         const dateStr = msgDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-        // Date separator
+        // Date separator (Instagram-style pill)
         if (dateStr !== lastDate) {
             html += `<div class="chat-date-sep"><span>${dateStr}</span></div>`;
             lastDate = dateStr;
+            prevMsgSameAuthor = false;
         }
 
-        html += renderChatBubble(msg);
+        // Message grouping logic
+        const nextMsg = idx < messages.length - 1 ? messages[idx + 1] : null;
+        const sameAuthorAsPrev = prevMsg && prevMsg.author === msg.author && !prevMsg.deleted;
+        const sameAuthorAsNext = nextMsg && nextMsg.author === msg.author && !msg.deleted;
+        const sameDateAsNext = nextMsg ? (nextMsg.createdAt ? (nextMsg.createdAt.toDate ? nextMsg.createdAt.toDate() : new Date(nextMsg.createdAt)) : new Date()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) === dateStr : false;
+
+        let groupClass = 'group-single';
+        if (sameAuthorAsPrev && sameAuthorAsNext && sameDateAsNext) {
+            groupClass = 'group-middle';
+        } else if (sameAuthorAsPrev && (!sameAuthorAsNext || !sameDateAsNext)) {
+            groupClass = 'group-last';
+        } else if (!sameAuthorAsPrev && sameAuthorAsNext && sameDateAsNext) {
+            groupClass = 'group-first';
+        }
+
+        // Determine if this is the first message in a group (for avatar display)
+        const isFirstInGroup = groupClass === 'group-first' || groupClass === 'group-single';
+        // Determine if this is the last message in a group (for time display)
+        const isLastInGroup = groupClass === 'group-last' || groupClass === 'group-single';
+
+        // Find the last sent message for "Seen" receipt
+        const isLastSentByMe = msg.author === currentUser && !msg.deleted &&
+            !messages.slice(idx + 1).some(m => m.author === currentUser && !m.deleted);
+
+        html += renderChatBubble(msg, groupClass, isFirstInGroup, isLastInGroup, isLastSentByMe);
+
+        prevMsg = msg;
+        prevMsgSameAuthor = sameAuthorAsPrev;
     });
 
     container.innerHTML = html;
 
+    // Animate new messages (only the last few)
+    const msgEls = container.querySelectorAll('.chat-msg');
+    const animCount = Math.min(3, msgEls.length);
+    for (let i = msgEls.length - animCount; i < msgEls.length; i++) {
+        if (i >= 0) msgEls[i].classList.add('msg-appear');
+    }
+
     // Auto-scroll
     if (wasAtBottom) {
-        container.scrollTop = container.scrollHeight;
+        requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
     } else {
         // Show new messages button
         const newMsgBtn = document.getElementById('chatNewMsgBtn');
@@ -2146,18 +2183,31 @@ function renderChatMessages(messages) {
     bindChatMessageEvents();
 }
 
-function renderChatBubble(msg) {
+function renderChatBubble(msg, groupClass, isFirstInGroup, isLastInGroup, isLastSentByMe) {
     const isMine = msg.author === currentUser;
     const cls = isMine ? 'chat-msg-sent' : 'chat-msg-received';
     const time = formatChatTime(msg.createdAt);
 
     if (msg.deleted) {
-        return `<div class="chat-msg ${cls}" data-msg-id="${msg.id}">
-            <div class="chat-bubble"><span class="chat-msg-deleted">Message deleted</span>
-            <div class="chat-msg-meta"><span class="chat-msg-time">${time}</span></div></div></div>`;
+        const avatarHtml = (!isMine && isFirstInGroup) ?
+            `<div class="chat-msg-avatar user-${msg.author ? msg.author.toLowerCase() : 'p'}">${msg.author || '?'}</div>` :
+            (!isMine ? `<div class="chat-msg-avatar invisible">·</div>` : '');
+        return `<div class="chat-msg ${cls} ${groupClass}" data-msg-id="${msg.id}" data-msg-author="${msg.author}">
+            ${avatarHtml}<div class="chat-bubble"><span class="chat-msg-deleted">Message unavailable</span>
+            ${isLastInGroup ? `<div class="chat-msg-meta"><span class="chat-msg-time">${time}</span></div>` : ''}</div></div>`;
     }
 
-    // Reply reference
+    // Avatar for received messages (first in group shows, others invisible spacer)
+    let avatarHtml = '';
+    if (!isMine) {
+        if (isFirstInGroup) {
+            avatarHtml = `<div class="chat-msg-avatar user-${msg.author ? msg.author.toLowerCase() : 'p'}">${msg.author || '?'}</div>`;
+        } else {
+            avatarHtml = `<div class="chat-msg-avatar invisible">·</div>`;
+        }
+    }
+
+    // Reply reference (Instagram-style)
     let replyHtml = '';
     if (msg.replyTo) {
         const replyAuthor = msg.replyToAuthor || '?';
@@ -2178,17 +2228,19 @@ function renderChatBubble(msg) {
         contentHtml += `<div>${escapeHtml(msg.text)}</div>`;
     }
 
-    // Read receipts
-    let readHtml = '';
-    if (isMine) {
+    // "Seen" receipt — Instagram-style: only on the LAST sent message
+    let seenHtml = '';
+    if (isMine && isLastSentByMe) {
         const readBy = msg.readBy || {};
         const partnerRead = Object.keys(readBy).some(k => k !== currentUser.toLowerCase());
         if (partnerRead) {
-            readHtml = '<span class="chat-msg-read read">✓✓</span>';
-        } else {
-            readHtml = '<span class="chat-msg-read delivered">✓✓</span>';
+            seenHtml = '<span class="chat-msg-seen">Seen</span>';
         }
     }
+
+    // Only show time on last message in group
+    const metaHtml = isLastInGroup ?
+        `<div class="chat-msg-meta"><span class="chat-msg-time">${time}</span>${seenHtml}</div>` : '';
 
     // Reactions
     let reactionsHtml = '';
@@ -2202,18 +2254,17 @@ function renderChatBubble(msg) {
         reactionsHtml = `<div class="chat-msg-reactions">${badges}</div>`;
     }
 
-    return `<div class="chat-msg ${cls}" data-msg-id="${msg.id}" data-msg-author="${msg.author}">
-        <div class="chat-bubble">${replyHtml}${contentHtml}
-        <div class="chat-msg-meta"><span class="chat-msg-time">${time}</span>${readHtml}</div></div>
+    return `<div class="chat-msg ${cls} ${groupClass}" data-msg-id="${msg.id}" data-msg-author="${msg.author}">
+        ${avatarHtml}<div class="chat-bubble">${replyHtml}${contentHtml}${metaHtml}</div>
         ${reactionsHtml}</div>`;
 }
 
 function renderVoiceMessage(voiceData, isMine, msgId) {
-    const bars = Array.from({length: 20}, () => {
-        const h = Math.random() * 16 + 4;
+    // Instagram-style voice player: play circle, waveform bars, duration
+    const bars = Array.from({length: 24}, (_, i) => {
+        const h = Math.max(4, Math.sin(i * 0.5) * 12 + Math.random() * 10 + 4);
         return `<div class="chat-voice-bar" style="height:${h}px"></div>`;
     }).join('');
-    // Use data-action attribute instead of inline onclick for reliability
     return `<div class="chat-voice-msg" data-voice-id="${msgId}">
         <button class="chat-voice-play" data-action="play-voice" data-voice-id="${msgId}"><i class="fas fa-play"></i></button>
         <div class="chat-voice-wave">${bars}</div>
@@ -2375,12 +2426,17 @@ function bindChatMessageEvents() {
         }
     });
 
-    // ---- Per-message events: long-press + swipe-to-reply ----
+    // ---- Per-message events: double-tap, long-press + swipe-to-reply ----
     container.querySelectorAll('.chat-msg').forEach(el => {
         const msgId = el.dataset.msgId;
         let timer = null;
         let touchStartX = 0;
         let touchStartY = 0;
+
+        // ---- Double-tap state ----
+        let lastTapTime = 0;
+        let lastTapX = 0;
+        let lastTapY = 0;
 
         // ---- Swipe-to-reply state ----
         let swipeStartX = 0;
@@ -2413,7 +2469,31 @@ function bindChatMessageEvents() {
             }
         };
 
-        // ---- Swipe-to-reply: touch handlers ----
+        // ---- Double-tap handler (Instagram-style heart) ----
+        const handleDoubleTap = (x, y) => {
+            // Add heart reaction
+            addChatReaction(msgId, 'heart');
+            // Show big heart animation at tap position
+            showHeartAnimation(x, y);
+        };
+
+        // Check for double-tap on touchend
+        const checkDoubleTap = (x, y) => {
+            const now = Date.now();
+            const dx = Math.abs(x - lastTapX);
+            const dy = Math.abs(y - lastTapY);
+            if (now - lastTapTime < 350 && dx < 30 && dy < 30) {
+                handleDoubleTap(x, y);
+                lastTapTime = 0; // Reset to prevent triple-tap
+                return true;
+            }
+            lastTapTime = now;
+            lastTapX = x;
+            lastTapY = y;
+            return false;
+        };
+
+        // ---- Swipe-to-reply: touch handlers (Instagram-style spring animation) ----
         const swipeTouchStart = (e) => {
             if (e.touches.length !== 1) return;
             swipeStartX = e.touches[0].clientX;
@@ -2429,28 +2509,28 @@ function bindChatMessageEvents() {
             const dx = e.touches[0].clientX - swipeStartX;
             const dy = e.touches[0].clientY - swipeStartY;
 
-            // Activate swipe on ANY horizontal direction (left or right)
+            // Activate swipe on ANY horizontal direction
             if (!swipeActive && Math.abs(dx) > 20 && Math.abs(dx) > Math.abs(dy) * 1.5) {
                 swipeActive = true;
                 swipeDir = dx > 0 ? 1 : -1;
             }
 
             if (swipeActive) {
-                // Move bubble in the swipe direction, capped at 80px
-                const offset = swipeDir * Math.min(Math.abs(dx), 80);
+                // Move bubble in swipe direction, capped at 80px with slight resistance
+                const maxOffset = 80;
+                const rawOffset = Math.abs(dx);
+                const resistance = rawOffset > maxOffset ? maxOffset + (rawOffset - maxOffset) * 0.3 : rawOffset;
+                const offset = swipeDir * Math.min(resistance, 100);
                 el.style.transform = `translateX(${offset}px)`;
                 // Show reply icon on the opposite side of the swipe
                 if (!el.querySelector('.swipe-reply-icon')) {
                     const icon = document.createElement('div');
                     icon.className = 'swipe-reply-icon';
                     icon.innerHTML = '<i class="fas fa-reply"></i>';
-                    // Icon appears on the side the bubble is moving away from
                     if (swipeDir > 0) {
-                        icon.style.left = '-36px';
-                        icon.style.right = '';
+                        icon.classList.add('left');
                     } else {
-                        icon.style.right = '-36px';
-                        icon.style.left = '';
+                        icon.classList.add('right');
                     }
                     el.appendChild(icon);
                 }
@@ -2459,14 +2539,15 @@ function bindChatMessageEvents() {
         };
 
         const swipeTouchEnd = (e) => {
-            el.style.transition = 'transform 0.2s ease-out';
+            // Spring animation back to original position
+            el.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
             el.style.transform = 'translateX(0)';
 
             // Remove reply icon after animation
             setTimeout(() => {
                 const icon = el.querySelector('.swipe-reply-icon');
                 if (icon) icon.remove();
-            }, 200);
+            }, 400);
 
             // Trigger reply if swiped far enough
             if (swipeActive && swipeMoved) {
@@ -2484,11 +2565,23 @@ function bindChatMessageEvents() {
 
         // Touch events - DO NOT call preventDefault on touchstart (that blocks scrolling!)
         el.addEventListener('touchstart', (e) => { startPress(e); swipeTouchStart(e); }, { passive: true });
-        el.addEventListener('touchend', (e) => { endPress(); swipeTouchEnd(e); });
+        el.addEventListener('touchend', (e) => {
+            endPress();
+            // Check double-tap
+            const touch = e.changedTouches ? e.changedTouches[0] : e;
+            const wasDoubleTap = checkDoubleTap(touch.clientX, touch.clientY);
+            if (wasDoubleTap) {
+                clearTimeout(timer); // Cancel any pending long-press
+            }
+            swipeTouchEnd(e);
+        });
         el.addEventListener('touchmove', (e) => { movePress(e); swipeTouchMove(e); }, { passive: true });
         // Mouse events for desktop
         el.addEventListener('mousedown', startPress);
-        el.addEventListener('mouseup', endPress);
+        el.addEventListener('mouseup', (e) => {
+            endPress();
+            checkDoubleTap(e.clientX, e.clientY);
+        });
         el.addEventListener('mouseleave', endPress);
         // Right-click context menu for desktop
         el.addEventListener('contextmenu', e => {
@@ -2497,6 +2590,26 @@ function bindChatMessageEvents() {
             showChatContextMenuAt(e.clientX, e.clientY, msgId);
         });
     });
+}
+
+// ---- Instagram-style Heart Animation ----
+function showHeartAnimation(x, y) {
+    const heart = document.getElementById('doubleTapHeart');
+    if (!heart) return;
+    // Position at the tap location
+    heart.style.left = x + 'px';
+    heart.style.top = y + 'px';
+    // Reset animation
+    heart.classList.remove('show');
+    // Force reflow
+    void heart.offsetWidth;
+    heart.style.display = 'block';
+    heart.classList.add('show');
+    // Clean up after animation
+    setTimeout(() => {
+        heart.classList.remove('show');
+        heart.style.display = 'none';
+    }, 1000);
 }
 
 function showChatContextMenuAt(x, y, msgId) {
@@ -2647,6 +2760,13 @@ function startVoiceRecording() {
             voiceRecordingSeconds = 0;
             document.getElementById('chatVoiceOverlay').style.display = 'flex';
             document.getElementById('chatInputBar').style.display = 'none';
+            // Populate recording waveform bars
+            const waveformEl = document.getElementById('voiceRecWaveform');
+            if (waveformEl) {
+                waveformEl.innerHTML = Array.from({length: 30}, (_, i) =>
+                    `<div class="voice-rec-waveform-bar" style="animation-delay:${i * 0.08}s"></div>`
+                ).join('');
+            }
             voiceRecordingTimer = setInterval(() => {
                 voiceRecordingSeconds++;
                 const m = Math.floor(voiceRecordingSeconds / 60);
@@ -2778,7 +2898,7 @@ async function addChatReaction(msgId, reactionType) {
     } catch (e) { console.error('Chat reaction failed:', e); showToast('Reaction failed'); }
 }
 
-// ---- Reply ----
+// ---- Reply (Instagram-style) ----
 function replyToMessage(msgId) {
     const msg = allChatMessages.find(m => m.id === msgId);
     if (!msg) return;
@@ -2848,6 +2968,7 @@ function scrollToMessage(msgId) {
 function formatChatTime(timestamp) {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    // Instagram-style: just show time, no date
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
@@ -2857,8 +2978,16 @@ function updateChatSendBtn() {
     const voiceBtn = document.getElementById('chatVoiceBtn');
     if (!input || !sendBtn) return;
     const hasText = input.value.trim().length > 0;
-    sendBtn.disabled = !hasText;
-    if (voiceBtn) voiceBtn.style.display = hasText ? 'none' : 'flex';
+    // Instagram-style: send button morphs from mic when typing
+    if (hasText) {
+        sendBtn.classList.add('visible');
+        sendBtn.disabled = false;
+        if (voiceBtn) voiceBtn.classList.add('hidden');
+    } else {
+        sendBtn.classList.remove('visible');
+        sendBtn.disabled = true;
+        if (voiceBtn) voiceBtn.classList.remove('hidden');
+    }
 }
 
 function scrollChatToBottom() {
