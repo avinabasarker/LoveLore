@@ -1964,8 +1964,11 @@ function switchScreen(screenId) {
         if (topBar) topBar.style.display = 'none';
         if (bottomNav) bottomNav.classList.add('chat-hidden');
         if (offlineBanner) offlineBanner.style.display = 'none';
-        // Mark chat messages as read when entering chat
-        setTimeout(() => markMessagesAsRead(), 500);
+        // Scroll to bottom when opening chat (Instagram opens at newest messages)
+        setTimeout(() => {
+            scrollChatToBottom();
+            markMessagesAsRead();
+        }, 100);
     } else {
         if (topBar) topBar.style.display = 'flex';
         if (bottomNav) bottomNav.classList.remove('chat-hidden');
@@ -2136,7 +2139,9 @@ function renderChatMessages(messages) {
     if (emptyEl) emptyEl.style.display = 'none';
 
     // Check if we should auto-scroll
-    const wasAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 80;
+    // If chat is not currently visible (switching to chat tab), always scroll to bottom
+    const isChatVisible = document.getElementById('chatScreen').classList.contains('active');
+    const wasAtBottom = !isChatVisible || container.scrollHeight - container.scrollTop - container.clientHeight < 80;
 
     let html = '';
     let lastDate = null;
@@ -2193,9 +2198,11 @@ function renderChatMessages(messages) {
         if (i >= 0) msgEls[i].classList.add('msg-appear');
     }
 
-    // Auto-scroll
+    // Auto-scroll — always scroll to bottom on first load or when near bottom
     if (wasAtBottom) {
+        // Use both rAF and a fallback timeout for reliable mobile scrolling
         requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+        setTimeout(() => { container.scrollTop = container.scrollHeight; }, 150);
     } else {
         // Show new messages button
         const newMsgBtn = document.getElementById('chatNewMsgBtn');
@@ -2443,32 +2450,43 @@ function stopVoicePlayUI(msgId) {
     // Will update with final duration once metadata loads
 }
 
+// Track if container-level listeners are already bound (prevent duplicates on re-render)
+let _chatContainerEventsBound = false;
+
 function bindChatMessageEvents() {
     const container = document.getElementById('chatMessages');
 
-    // ---- Voice play button (event delegation) ----
-    container.addEventListener('click', e => {
-        const playBtn = e.target.closest('[data-action="play-voice"]');
-        if (playBtn) {
-            e.stopPropagation();
-            const voiceId = playBtn.dataset.voiceId;
-            if (voiceId) playVoiceMessage(voiceId);
-            return;
-        }
-    });
+    // ---- Voice play button (event delegation — bind ONCE) ----
+    if (!_chatContainerEventsBound) {
+        _chatContainerEventsBound = true;
+        container.addEventListener('click', e => {
+            const playBtn = e.target.closest('[data-action="play-voice"]');
+            if (playBtn) {
+                e.stopPropagation();
+                const voiceId = playBtn.dataset.voiceId;
+                if (voiceId) playVoiceMessage(voiceId);
+                return;
+            }
+        });
+    }
 
     // ---- Per-message events: double-tap, long-press + swipe-to-reply ----
     container.querySelectorAll('.chat-msg').forEach(el => {
+        // Skip if events already bound for this element
+        if (el.dataset.eventsBound) return;
+        el.dataset.eventsBound = '1';
+
         const msgId = el.dataset.msgId;
         let timer = null;
         let touchStartX = 0;
         let touchStartY = 0;
         let longPressFired = false;
 
-        // ---- Double-tap state ----
+        // ---- Double-tap state (per message) ----
         let lastTapTime = 0;
         let lastTapX = 0;
         let lastTapY = 0;
+        let singleTapTimer = null;
 
         // ---- Swipe-to-reply state ----
         let swipeStartX = 0;
@@ -2505,18 +2523,20 @@ function bindChatMessageEvents() {
 
         // ---- Double-tap handler (Instagram-style heart) ----
         const handleDoubleTap = (x, y) => {
+            // Cancel any pending single-tap
+            clearTimeout(singleTapTimer);
             // Add heart reaction
             addChatReaction(msgId, 'heart');
             // Show big heart animation at tap position
             showHeartAnimation(x, y);
         };
 
-        // Check for double-tap on touchend
+        // Check for double-tap on touchend — ONLY double-tap reacts, single tap does nothing
         const checkDoubleTap = (x, y) => {
             const now = Date.now();
             const dx = Math.abs(x - lastTapX);
             const dy = Math.abs(y - lastTapY);
-            if (now - lastTapTime < 350 && dx < 30 && dy < 30) {
+            if (now - lastTapTime < 350 && dx < 40 && dy < 40) {
                 handleDoubleTap(x, y);
                 lastTapTime = 0; // Reset to prevent triple-tap
                 return true;
@@ -2524,6 +2544,7 @@ function bindChatMessageEvents() {
             lastTapTime = now;
             lastTapX = x;
             lastTapY = y;
+            // Single tap does NOTHING — no reaction, no action
             return false;
         };
 
@@ -2603,13 +2624,12 @@ function bindChatMessageEvents() {
             endPress();
             // Record touch end time to prevent synthetic mouse events
             _lastTouchEndTime = Date.now();
-            // Check double-tap - ONLY double-tap adds heart reaction
+            // Check double-tap - ONLY double-tap adds heart reaction, single tap does NOTHING
             const touch = e.changedTouches ? e.changedTouches[0] : e;
             const wasDoubleTap = checkDoubleTap(touch.clientX, touch.clientY);
             if (wasDoubleTap) {
                 clearTimeout(timer); // Cancel any pending long-press
             }
-            // Single tap does NOTHING (Instagram-style: only double-tap reacts)
             swipeTouchEnd(e);
         });
         el.addEventListener('touchmove', (e) => { movePress(e); swipeTouchMove(e); }, { passive: true });
@@ -2622,7 +2642,7 @@ function bindChatMessageEvents() {
             if (Date.now() - _lastTouchEndTime < 800) return; // Ignore synthetic mouse event after touch
             endPress();
             checkDoubleTap(e.clientX, e.clientY);
-            // Only double-tap/double-click adds heart — single click does nothing
+            // Only double-click adds heart — single click does nothing
         });
         el.addEventListener('mouseleave', endPress);
         // Right-click context menu for desktop
