@@ -24,8 +24,8 @@
     --shadow-md: rgba(0, 0, 0, 0.06);
     --a-color: #FF6B8A;
     --a-bg: #FFE0E6;
-    --p-color: #8BC4A3;
-    --p-bg: #E0F2E9;
+    --p-color: #FF6B8A;
+    --p-bg: #FFE0E6;
     --radius-sm: 10px;
     --radius-md: 16px;
     --radius-lg: 24px;
@@ -132,7 +132,7 @@ html, body {
 .avatar-btn:active { transform: scale(0.95); }
 .avatar-btn.selected { transform: scale(1.12); box-shadow: 0 8px 32px var(--primary-glow); }
 .avatar-btn.avatar-a.selected { border-color: var(--a-color); box-shadow: 0 8px 32px rgba(255, 107, 138, 0.4); }
-.avatar-btn.avatar-p.selected { border-color: var(--p-color); box-shadow: 0 8px 32px rgba(139, 196, 163, 0.4); }
+.avatar-btn.avatar-p.selected { border-color: var(--p-color); box-shadow: 0 8px 32px rgba(255, 107, 138, 0.4); }
 .avatar-letter { font-family: 'Playfair Display', serif; font-size: 36px; font-weight: 700; }
 .avatar-a .avatar-letter { color: var(--a-color); }
 .avatar-p .avatar-letter { color: var(--p-color); }
