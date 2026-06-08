@@ -43,6 +43,18 @@ const REACTION_TYPES = {
     fire: { emoji: '🔥', label: 'Hot' }
 };
 
+const CHAT_THEMES = {
+    default: { label: 'Default', sent: '#6C5CE7', received: '#EFEFEF', bg: '#fff', sentGrad: 'linear-gradient(135deg, #6C5CE7, #a855f7)' },
+    love: { label: 'Love', sent: '#FF6B8A', received: '#FFE0E8', bg: 'linear-gradient(180deg, #FFF0F3 0%, #FFE0E8 50%, #FFF5F7 100%)', sentGrad: 'linear-gradient(135deg, #FF6B8A, #FF8FA3)' },
+    ocean: { label: 'Ocean', sent: '#2196F3', received: '#D0EAFB', bg: 'linear-gradient(180deg, #E8F4FD 0%, #D0EAFB 50%, #E8F4FD 100%)', sentGrad: 'linear-gradient(135deg, #2196F3, #42A5F5)' },
+    sunset: { label: 'Sunset', sent: '#FF9800', received: '#FFE0B2', bg: 'linear-gradient(180deg, #FFF3E0 0%, #FFE0B2 50%, #FFF3E0 100%)', sentGrad: 'linear-gradient(135deg, #FF9800, #FFB74D)' },
+    forest: { label: 'Forest', sent: '#4CAF50', received: '#C8E6C9', bg: 'linear-gradient(180deg, #E8F5E9 0%, #C8E6C9 50%, #E8F5E9 100%)', sentGrad: 'linear-gradient(135deg, #4CAF50, #66BB6A)' },
+    midnight: { label: 'Midnight', sent: '#6C5CE7', received: '#2A2A4A', bg: 'linear-gradient(180deg, #1A1A2E 0%, #16213E 50%, #0F3460 100%)', sentGrad: 'linear-gradient(135deg, #6C5CE7, #a855f7)' },
+    lavender: { label: 'Lavender', sent: '#9C27B0', received: '#E1BEE7', bg: 'linear-gradient(180deg, #F3E5F5 0%, #E1BEE7 50%, #F3E5F5 100%)', sentGrad: 'linear-gradient(135deg, #9C27B0, #BA68C8)' },
+    cherry: { label: 'Cherry', sent: '#E91E63', received: '#F8BBD0', bg: 'linear-gradient(180deg, #FCE4EC 0%, #F8BBD0 50%, #FCE4EC 100%)', sentGrad: 'linear-gradient(135deg, #E91E63, #F06292)' },
+    cotton: { label: 'Cotton Candy', sent: '#00ACC1', received: '#B2EBF2', bg: 'linear-gradient(180deg, #E0F7FA 0%, #B2EBF2 50%, #E0F7FA 100%)', sentGrad: 'linear-gradient(135deg, #00ACC1, #26C6DA)' }
+};
+
 const MOOD_MAP = {
     loved: { emoji: '🥰', text: 'Feeling loved' },
     missing: { emoji: '💕', text: 'Missing you' },
@@ -150,6 +162,8 @@ let streakUnsubscribe = null;
 let moodHistoryUnsubscribe = null;
 let letterImageData = null;
 let allMoodHistoryCache = [];
+let _lastTouchEndTime = 0; // Prevent synthetic mouse events from triggering double-tap
+let currentChatTheme = localStorage.getItem('lovelore_chat_theme') || 'default';
 
 // ---- Encryption State ----
 let encryptionKey = null;
@@ -532,6 +546,14 @@ function setupEventListeners() {
     document.getElementById('chatAttachBtn').addEventListener('click', () => document.getElementById('chatImageInput').click());
     document.getElementById('chatImageInput').addEventListener('change', e => { if (e.target.files[0]) sendChatImage(e.target.files[0]); e.target.value = ''; });
     document.getElementById('chatVoiceBtn').addEventListener('click', startVoiceRecording);
+    // Chat theme button
+    document.getElementById('chatThemeBtn').addEventListener('click', openChatThemeModal);
+    document.getElementById('closeChatTheme').addEventListener('click', () => {
+        document.getElementById('chatThemeModal').style.display = 'none';
+    });
+    document.getElementById('chatThemeModal').addEventListener('click', e => {
+        if (e.target === e.currentTarget) e.target.style.display = 'none';
+    });
     document.getElementById('chatSearchBtn').addEventListener('click', openChatSearch);
     document.getElementById('chatSearchBack').addEventListener('click', closeChatSearch);
     document.getElementById('chatSearchInput').addEventListener('input', e => searchChatMessages(e.target.value));
@@ -841,6 +863,7 @@ function showMainApp() {
     renderProfile();
     attachChatListener();
     attachChatMetaListener();
+    loadChatTheme();
     updateOnlineStatus(true);
     attachLettersListener();
     loadStreak();
@@ -2296,6 +2319,8 @@ function playVoiceMessage(msgId) {
         _currentVoiceAudio.pause();
         _currentVoiceAudio.currentTime = 0;
         stopVoicePlayUI(_currentVoiceMsgId);
+        _currentVoiceAudio = null;
+        _currentVoiceMsgId = null;
     }
 
     try {
@@ -2308,16 +2333,30 @@ function playVoiceMessage(msgId) {
             return;
         }
 
+        // Get the MIME type stored when recording, or detect from data URL
+        const voiceMime = msg.voiceMime || '';
+        
         // Convert data URL to blob URL for reliable playback (large data URLs fail on mobile)
-        const blobUrl = dataUrlToBlobUrl(audioSrc);
+        const blobUrl = dataUrlToBlobUrl(audioSrc, voiceMime);
         if (!blobUrl) {
             showToast('Cannot play voice message');
             return;
         }
 
-        const audio = new Audio(blobUrl);
+        const audio = new Audio();
+        audio.src = blobUrl;
+        audio.preload = 'auto';
         _currentVoiceAudio = audio;
         _currentVoiceMsgId = msgId;
+
+        audio.oncanplaythrough = () => {
+            audio.play().catch(e => {
+                console.error('Voice play() failed:', e);
+                showToast('Cannot play voice message');
+                _currentVoiceAudio = null;
+                _currentVoiceMsgId = null;
+            });
+        };
 
         audio.onplay = () => {
             startVoicePlayUI(msgId, audio);
@@ -2328,19 +2367,15 @@ function playVoiceMessage(msgId) {
             _currentVoiceMsgId = null;
         };
         audio.onerror = (e) => {
-            console.error('Audio error:', e);
+            console.error('Audio error:', e, 'src type:', audioSrc ? audioSrc.substring(0, 30) : 'null');
             stopVoicePlayUI(msgId);
             _currentVoiceAudio = null;
             _currentVoiceMsgId = null;
             showToast('Cannot play this voice message');
         };
 
-        audio.play().catch(e => {
-            console.error('Voice play failed:', e);
-            showToast('Cannot play voice message');
-            _currentVoiceAudio = null;
-            _currentVoiceMsgId = null;
-        });
+        // Trigger loading
+        audio.load();
     } catch(e) {
         console.error('Voice play error:', e);
         showToast('Cannot play voice message');
@@ -2348,7 +2383,7 @@ function playVoiceMessage(msgId) {
 }
 
 // Convert data URL to blob URL — much more reliable for large audio on mobile
-function dataUrlToBlobUrl(dataUrl) {
+function dataUrlToBlobUrl(dataUrl, fallbackMime) {
     try {
         if (!dataUrl || typeof dataUrl !== 'string') return null;
 
@@ -2357,8 +2392,9 @@ function dataUrlToBlobUrl(dataUrl) {
 
         // Must be a data URL
         if (!dataUrl.startsWith('data:')) {
-            // Maybe it's raw base64 without the prefix
-            dataUrl = 'data:audio/webm;base64,' + dataUrl;
+            // Maybe it's raw base64 without the prefix — use the stored MIME type or default
+            const mime = fallbackMime || 'audio/webm';
+            dataUrl = 'data:' + mime + ';base64,' + dataUrl;
         }
 
         const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
@@ -2370,13 +2406,8 @@ function dataUrlToBlobUrl(dataUrl) {
         const mimeType = match[1];
         const base64 = match[2];
 
-        // Decode base64 to binary
-        const raw = atob(base64);
-        const len = raw.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {
-            bytes[i] = raw.charCodeAt(i);
-        }
+        // Use the efficient base64ToUint8 (handles large data without call stack overflow)
+        const bytes = base64ToUint8(base64);
 
         const blob = new Blob([bytes], { type: mimeType });
         return URL.createObjectURL(blob);
@@ -2432,6 +2463,7 @@ function bindChatMessageEvents() {
         let timer = null;
         let touchStartX = 0;
         let touchStartY = 0;
+        let longPressFired = false;
 
         // ---- Double-tap state ----
         let lastTapTime = 0;
@@ -2446,6 +2478,7 @@ function bindChatMessageEvents() {
         let swipeDir = 0; // -1 = left, 1 = right
 
         const startPress = (e) => {
+            longPressFired = false;
             // Store position for context menu positioning
             if (e.touches && e.touches.length > 0) {
                 touchStartX = e.touches[0].clientX;
@@ -2455,6 +2488,7 @@ function bindChatMessageEvents() {
                 touchStartY = e.clientY;
             }
             timer = setTimeout(() => {
+                longPressFired = true;
                 selectedChatMsgId = msgId;
                 showChatContextMenuAt(touchStartX, touchStartY, msgId);
             }, 500);
@@ -2567,20 +2601,28 @@ function bindChatMessageEvents() {
         el.addEventListener('touchstart', (e) => { startPress(e); swipeTouchStart(e); }, { passive: true });
         el.addEventListener('touchend', (e) => {
             endPress();
-            // Check double-tap
+            // Record touch end time to prevent synthetic mouse events
+            _lastTouchEndTime = Date.now();
+            // Check double-tap - ONLY double-tap adds heart reaction
             const touch = e.changedTouches ? e.changedTouches[0] : e;
             const wasDoubleTap = checkDoubleTap(touch.clientX, touch.clientY);
             if (wasDoubleTap) {
                 clearTimeout(timer); // Cancel any pending long-press
             }
+            // Single tap does NOTHING (Instagram-style: only double-tap reacts)
             swipeTouchEnd(e);
         });
         el.addEventListener('touchmove', (e) => { movePress(e); swipeTouchMove(e); }, { passive: true });
-        // Mouse events for desktop
-        el.addEventListener('mousedown', startPress);
+        // Mouse events for desktop - skip if touch just ended (prevents synthetic mouse double-tap)
+        el.addEventListener('mousedown', (e) => {
+            if (Date.now() - _lastTouchEndTime < 800) return; // Ignore synthetic mouse event after touch
+            startPress(e);
+        });
         el.addEventListener('mouseup', (e) => {
+            if (Date.now() - _lastTouchEndTime < 800) return; // Ignore synthetic mouse event after touch
             endPress();
             checkDoubleTap(e.clientX, e.clientY);
+            // Only double-tap/double-click adds heart — single click does nothing
         });
         el.addEventListener('mouseleave', endPress);
         // Right-click context menu for desktop
@@ -2707,93 +2749,255 @@ async function sendChatImage(file) {
 
 // ---- Voice Messages ----
 function startVoiceRecording() {
-    try {
-        navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-            // Pick the best supported MIME type (Safari doesn't support audio/webm)
-            let mimeType = 'audio/webm;codecs=opus';
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'audio/webm';
-            }
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'audio/ogg;codecs=opus';
-            }
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = 'audio/mp4';
-            }
-            if (!MediaRecorder.isTypeSupported(mimeType)) {
-                mimeType = '';  // Let the browser decide
-            }
+    // Check if MediaRecorder is available at all
+    if (typeof MediaRecorder === 'undefined') {
+        showToast('Voice recording not supported on this browser');
+        return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('Microphone access not available');
+        return;
+    }
+    if (isRecordingVoice) return;
 
-            const options = mimeType ? { mimeType } : {};
-            mediaRecorder = new MediaRecorder(stream, options);
-            const actualMime = mediaRecorder.mimeType || 'audio/webm';
-            voiceChunks = [];
-            mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
-            mediaRecorder.onstop = async () => {
-                stream.getTracks().forEach(t => t.stop());
-                const blob = new Blob(voiceChunks, { type: actualMime });
-                // Check size limit (Firestore doc max ~1MB, keep voice under 700KB after encryption)
-                if (blob.size > 500000) {
-                    showToast('Voice message too long. Try under 60 seconds.');
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = async () => {
-                    const base64 = reader.result;
-                    try {
-                        const encVoice = isEncryptionSetup ? await encryptText(base64) : base64;
-                        await fdb.collection(MESSAGES_COLLECTION).add({
-                            author: currentUser, text: '', voiceData: encVoice,
-                            encrypted: isEncryptionSetup,
-                            readBy: { [currentUser.toLowerCase()]: true },
-                            deleted: false, reactions: {},
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                        showToast('Voice message sent!');
-                    } catch (e) { console.error('Voice send failed:', e); showToast('Failed to send voice'); }
-                };
-                reader.readAsDataURL(blob);
-            };
-            // Request data every 5 seconds for better memory handling
-            mediaRecorder.start(5000);
-            isRecordingVoice = true;
-            voiceRecordingSeconds = 0;
-            document.getElementById('chatVoiceOverlay').style.display = 'flex';
-            document.getElementById('chatInputBar').style.display = 'none';
-            // Populate recording waveform bars
-            const waveformEl = document.getElementById('voiceRecWaveform');
-            if (waveformEl) {
-                waveformEl.innerHTML = Array.from({length: 30}, (_, i) =>
-                    `<div class="voice-rec-waveform-bar" style="animation-delay:${i * 0.08}s"></div>`
-                ).join('');
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        // Pick the best supported MIME type (Safari doesn't support audio/webm)
+        let mimeType = '';
+        const tryTypes = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/ogg;codecs=opus',
+            'audio/mp4',
+            'audio/mpeg'
+        ];
+        for (const type of tryTypes) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                mimeType = type;
+                break;
             }
-            voiceRecordingTimer = setInterval(() => {
-                voiceRecordingSeconds++;
-                const m = Math.floor(voiceRecordingSeconds / 60);
-                const s = voiceRecordingSeconds % 60;
-                document.getElementById('voiceRecTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
-                // Auto-stop at 60 seconds
-                if (voiceRecordingSeconds >= 60) {
-                    stopVoiceRecording(true);
+        }
+
+        const options = mimeType ? { mimeType } : {};
+        try {
+            mediaRecorder = new MediaRecorder(stream, options);
+        } catch (e) {
+            console.error('MediaRecorder creation failed:', e);
+            stream.getTracks().forEach(t => t.stop());
+            showToast('Voice recording not supported');
+            return;
+        }
+        const actualMime = mediaRecorder.mimeType || 'audio/webm';
+        voiceChunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunks.push(e.data); };
+        mediaRecorder.onerror = (e) => {
+            console.error('MediaRecorder error:', e);
+            stopVoiceRecording(false);
+            showToast('Recording error occurred');
+        };
+        mediaRecorder.onstop = async () => {
+            try { stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+            if (voiceChunks.length === 0) {
+                showToast('No voice data recorded');
+                return;
+            }
+            const blob = new Blob(voiceChunks, { type: actualMime });
+            // Check size limit (Firestore doc max ~1MB, keep voice under 500KB raw)
+            if (blob.size > 500000) {
+                showToast('Voice message too long. Try under 60 seconds.');
+                return;
+            }
+            // Convert to base64 safely using chunked approach
+            try {
+                const base64 = await blobToBase64(blob);
+                const encVoice = isEncryptionSetup ? await encryptText(base64) : base64;
+                const msgData = {
+                    author: currentUser, text: '', voiceData: encVoice,
+                    voiceMime: actualMime,
+                    encrypted: isEncryptionSetup,
+                    readBy: { [currentUser.toLowerCase()]: true },
+                    deleted: false, reactions: {},
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                if (replyingTo) {
+                    msgData.replyTo = replyingTo;
+                    const replyMsg = allChatMessages.find(m => m.id === replyingTo);
+                    if (replyMsg) {
+                        msgData.replyToAuthor = replyMsg.author || '?';
+                        msgData.replyToText = replyMsg.text || (replyMsg.imageData ? '📷 Photo' : (replyMsg.voiceData ? '🎙️ Voice' : ''));
+                    }
+                    cancelReply();
                 }
-            }, 1000);
-        }).catch(e => { console.error('Mic access denied:', e); showToast('Microphone access denied'); });
-    } catch (e) { console.error('Recording not supported:', e); showToast('Recording not supported'); }
+                await fdb.collection(MESSAGES_COLLECTION).add(msgData);
+                showToast('Voice message sent!');
+            } catch (e) { console.error('Voice send failed:', e); showToast('Failed to send voice message'); }
+        };
+        // Request data every 3 seconds for better chunk handling
+        try {
+            mediaRecorder.start(3000);
+        } catch (e) {
+            console.error('MediaRecorder start failed:', e);
+            stream.getTracks().forEach(t => t.stop());
+            showToast('Could not start recording');
+            return;
+        }
+        isRecordingVoice = true;
+        voiceRecordingSeconds = 0;
+        document.getElementById('chatVoiceOverlay').style.display = 'flex';
+        document.getElementById('chatInputBar').style.display = 'none';
+        // Populate recording waveform bars
+        const waveformEl = document.getElementById('voiceRecWaveform');
+        if (waveformEl) {
+            waveformEl.innerHTML = Array.from({length: 30}, (_, i) =>
+                `<div class="voice-rec-waveform-bar" style="animation-delay:${i * 0.08}s"></div>`
+            ).join('');
+        }
+        voiceRecordingTimer = setInterval(() => {
+            voiceRecordingSeconds++;
+            const m = Math.floor(voiceRecordingSeconds / 60);
+            const s = voiceRecordingSeconds % 60;
+            document.getElementById('voiceRecTime').textContent = `${m}:${String(s).padStart(2, '0')}`;
+            // Auto-stop at 60 seconds
+            if (voiceRecordingSeconds >= 60) {
+                stopVoiceRecording(true);
+            }
+        }, 1000);
+    }).catch(e => {
+        console.error('Mic access denied:', e);
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            showToast('Microphone permission denied. Please allow mic access.');
+        } else if (e.name === 'NotFoundError') {
+            showToast('No microphone found on this device');
+        } else {
+            showToast('Could not access microphone');
+        }
+    });
+}
+
+// Safe blob to base64 conversion (avoids FileReader issues on some mobile browsers)
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('FileReader failed'));
+        reader.readAsDataURL(blob);
+    });
 }
 
 function stopVoiceRecording(send) {
-    if (!mediaRecorder || !isRecordingVoice) return;
+    if (!isRecordingVoice) return;
     clearInterval(voiceRecordingTimer);
     isRecordingVoice = false;
     document.getElementById('chatVoiceOverlay').style.display = 'none';
     document.getElementById('chatInputBar').style.display = 'flex';
-    if (send) {
-        try { mediaRecorder.stop(); } catch(e) { console.error('Stop recorder failed:', e); }
-    } else {
+    if (send && mediaRecorder) {
         try {
-            mediaRecorder.stream.getTracks().forEach(t => t.stop());
+            if (mediaRecorder.state === 'recording') {
+                mediaRecorder.stop(); // This triggers onstop which sends the message
+            }
+        } catch(e) { console.error('Stop recorder failed:', e); mediaRecorder = null; }
+    } else {
+        // Cancel recording
+        try {
+            if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        } catch(e) {}
+        try {
+            if (mediaRecorder && mediaRecorder.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
         } catch(e) {}
         mediaRecorder = null;
+        voiceChunks = [];
+    }
+}
+
+// ---- Chat Themes ----
+function openChatThemeModal() {
+    const modal = document.getElementById('chatThemeModal');
+    const grid = document.getElementById('chatThemeGrid');
+    grid.innerHTML = '';
+    Object.entries(CHAT_THEMES).forEach(([key, theme]) => {
+        const btn = document.createElement('button');
+        btn.className = 'chat-theme-option' + (currentChatTheme === key ? ' active' : '');
+        btn.innerHTML = `
+            <div class="chat-theme-preview" style="background:${theme.bg}">
+                <div class="preview-sent" style="background:${theme.sentGrad || theme.sent}"></div>
+                <div class="preview-received" style="background:${theme.received}"></div>
+            </div>
+            <span class="chat-theme-label">${theme.label}</span>
+        `;
+        btn.addEventListener('click', () => {
+            applyChatTheme(key);
+            currentChatTheme = key;
+            localStorage.setItem('lovelore_chat_theme', key);
+            // Save to Firestore so partner sees it too
+            if (fdb) {
+                fdb.collection(CHAT_META_COLLECTION).doc('theme').set({ current: key, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }).catch(e => console.error('Theme save failed:', e));
+            }
+            // Update active state
+            grid.querySelectorAll('.chat-theme-option').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            showToast('Theme applied!');
+        });
+        grid.appendChild(btn);
+    });
+    modal.style.display = 'flex';
+}
+
+function applyChatTheme(themeKey) {
+    const theme = CHAT_THEMES[themeKey];
+    if (!theme) return;
+    const root = document.documentElement;
+    // Set CSS custom properties for the chat theme
+    root.style.setProperty('--chat-bg', theme.bg);
+    root.style.setProperty('--chat-sent-grad', theme.sentGrad || theme.sent);
+    root.style.setProperty('--chat-sent', theme.sent);
+    root.style.setProperty('--chat-received', theme.received);
+    // Handle dark themes
+    if (themeKey === 'midnight') {
+        root.style.setProperty('--chat-text-received', '#E0E0E0');
+        root.style.setProperty('--chat-time-sent', 'rgba(255,255,255,0.6)');
+        root.style.setProperty('--chat-time-received', 'rgba(255,255,255,0.4)');
+        root.style.setProperty('--chat-header-bg', '#1A1A2E');
+        root.style.setProperty('--chat-header-border', '#2A2A4A');
+        root.style.setProperty('--chat-input-bg', '#1A1A2E');
+        root.style.setProperty('--chat-input-wrapper-bg', '#2A2A4A');
+        root.style.setProperty('--chat-header-text', '#E0E0E0');
+        root.style.setProperty('--chat-input-text', '#E0E0E0');
+        root.style.setProperty('--chat-date-pill', '#2A2A4A');
+        root.style.setProperty('--chat-date-text', 'rgba(255,255,255,0.5)');
+    } else {
+        root.style.setProperty('--chat-text-received', '');
+        root.style.setProperty('--chat-time-sent', '');
+        root.style.setProperty('--chat-time-received', '');
+        root.style.setProperty('--chat-header-bg', '');
+        root.style.setProperty('--chat-header-border', '');
+        root.style.setProperty('--chat-input-bg', '');
+        root.style.setProperty('--chat-input-wrapper-bg', '');
+        root.style.setProperty('--chat-header-text', '');
+        root.style.setProperty('--chat-input-text', '');
+        root.style.setProperty('--chat-date-pill', '');
+        root.style.setProperty('--chat-date-text', '');
+    }
+    // Set the data attribute on body for CSS selectors
+    document.body.setAttribute('data-chat-theme', themeKey === 'default' ? '' : themeKey);
+    currentChatTheme = themeKey;
+}
+
+function loadChatTheme() {
+    // Load from localStorage first for instant apply
+    const savedTheme = localStorage.getItem('lovelore_chat_theme');
+    if (savedTheme) {
+        applyChatTheme(savedTheme);
+    }
+    // Then listen for Firestore changes (partner changes)
+    if (fdb) {
+        fdb.collection(CHAT_META_COLLECTION).doc('theme').onSnapshot(doc => {
+            if (doc.exists) {
+                const theme = doc.data().current;
+                if (theme && theme !== currentChatTheme) {
+                    applyChatTheme(theme);
+                    localStorage.setItem('lovelore_chat_theme', theme);
+                }
+            }
+        });
     }
 }
 
