@@ -23,14 +23,11 @@ const POSTS_COLLECTION = 'social_posts';
 const COMMENTS_COLLECTION = 'social_comments';
 const SETTINGS_COLLECTION = 'social_settings';
 const CAPSULES_COLLECTION = 'social_capsules';
-const MOODS_COLLECTION = 'social_moods';
 const COUNTDOWNS_COLLECTION = 'social_countdowns';
 const DAILY_NOTES_COLLECTION = 'social_daily_notes';
 const MESSAGES_COLLECTION = 'social_messages';
 const CHAT_META_COLLECTION = 'social_chat_meta';
 const LETTERS_COLLECTION = 'social_letters';
-const STREAKS_COLLECTION = 'social_streaks';
-const MOOD_HISTORY_COLLECTION = 'social_mood_history';
 const IMAGE_MAX_WIDTH = 800;
 const IMAGE_QUALITY = 0.6;
 
@@ -53,17 +50,6 @@ const CHAT_THEMES = {
     lavender: { label: 'Lavender', sent: '#9C27B0', received: '#E1BEE7', bg: 'linear-gradient(180deg, #F3E5F5 0%, #E1BEE7 50%, #F3E5F5 100%)', sentGrad: 'linear-gradient(135deg, #9C27B0, #BA68C8)' },
     cherry: { label: 'Cherry', sent: '#E91E63', received: '#F8BBD0', bg: 'linear-gradient(180deg, #FCE4EC 0%, #F8BBD0 50%, #FCE4EC 100%)', sentGrad: 'linear-gradient(135deg, #E91E63, #F06292)' },
     cotton: { label: 'Cotton Candy', sent: '#00ACC1', received: '#B2EBF2', bg: 'linear-gradient(180deg, #E0F7FA 0%, #B2EBF2 50%, #E0F7FA 100%)', sentGrad: 'linear-gradient(135deg, #00ACC1, #26C6DA)' }
-};
-
-const MOOD_MAP = {
-    loved: { emoji: '🥰', text: 'Feeling loved' },
-    missing: { emoji: '💕', text: 'Missing you' },
-    thinking: { emoji: '💭', text: 'Thinking of you' },
-    excited: { emoji: '😍', text: "Can't wait!" },
-    happy: { emoji: '😊', text: 'Happy' },
-    sad: { emoji: '😢', text: 'Missing you badly' },
-    grateful: { emoji: '🙏', text: 'Grateful for you' },
-    playful: { emoji: '😜', text: 'Feeling playful' }
 };
 
 const DAILY_PROMPTS = [
@@ -135,14 +121,12 @@ let postsUnsubscribe = null;
 let commentsUnsubscribe = null;
 let capsulesUnsubscribe = null;
 let countdownsUnsubscribe = null;
-let moodsUnsubscribe = null;
 let currentPostForComments = null;
 let pendingImageData = null;
 let selectedUser = null;
 let lastTapTime = 0;
 let lastTapPostId = null;
 let allPostsCache = [];
-let allMoodsCache = {};
 let chatUnsubscribe = null;
 let chatMetaUnsubscribe = null;
 let chatSearchMode = false;
@@ -158,10 +142,7 @@ let typingTimeout = null;
 let chatScrolledToBottom = true;
 let allChatMessages = [];
 let lettersUnsubscribe = null;
-let streakUnsubscribe = null;
-let moodHistoryUnsubscribe = null;
 let letterImageData = null;
-let allMoodHistoryCache = [];
 let _lastTouchEndTime = 0; // Prevent synthetic mouse events from triggering double-tap
 let currentChatTheme = localStorage.getItem('lovelore_chat_theme') || 'default';
 
@@ -503,8 +484,6 @@ function setupEventListeners() {
         });
     });
     // ---- NEW FEATURE BUTTON WIRING ----
-    // Mood indicator in top bar
-    document.getElementById('moodIndicatorTop').addEventListener('click', openMoodSetter);
     // Capsules tab: add buttons
     document.getElementById('addCountdownBtn').addEventListener('click', openCountdownModal);
     document.getElementById('addCapsuleBtn').addEventListener('click', openCapsuleCreateModal);
@@ -517,22 +496,12 @@ function setupEventListeners() {
     // Countdown modal: close + create button
     document.getElementById('closeCountdownModal').addEventListener('click', closeCountdownModal);
     document.getElementById('createCountdownBtn').addEventListener('click', createCountdown);
-    // Mood modal: close + set button + mood options
-    document.getElementById('closeMoodModal').addEventListener('click', closeMoodModal);
-    document.getElementById('setMoodBtn').addEventListener('click', setMood);
-    document.querySelectorAll('.mood-opt').forEach(opt => {
-        opt.addEventListener('click', () => {
-            document.querySelectorAll('.mood-opt').forEach(o => o.classList.remove('active'));
-            opt.classList.add('active');
-            selectedMood = opt.dataset.mood;
-        });
-    });
     // Daily note modal: close + send + banner click
     document.getElementById('closeDailyNoteModal').addEventListener('click', closeDailyNoteModal);
     document.getElementById('sendDailyNoteBtn').addEventListener('click', submitDailyNote);
     document.getElementById('dailyNoteBanner').addEventListener('click', openDailyNoteModal);
     // Close modals on overlay click
-    ['capsuleCreateModal', 'capsuleViewModal', 'countdownModal', 'moodModal', 'dailyNoteModal'].forEach(id => {
+    ['capsuleCreateModal', 'capsuleViewModal', 'countdownModal', 'dailyNoteModal'].forEach(id => {
         document.getElementById(id).addEventListener('click', e => { if (e.target === e.currentTarget) e.target.style.display = 'none'; });
     });
     // Chat event listeners
@@ -720,22 +689,18 @@ function handleLogout() {
     if (commentsUnsubscribe) commentsUnsubscribe();
     if (capsulesUnsubscribe) capsulesUnsubscribe();
     if (countdownsUnsubscribe) countdownsUnsubscribe();
-    if (moodsUnsubscribe) moodsUnsubscribe();
     postsUnsubscribe = null; commentsUnsubscribe = null;
     capsulesUnsubscribe = null; countdownsUnsubscribe = null;
-    moodsUnsubscribe = null;
     if (chatUnsubscribe) chatUnsubscribe();
     if (chatMetaUnsubscribe) chatMetaUnsubscribe();
     if (lettersUnsubscribe) lettersUnsubscribe();
-    if (streakUnsubscribe) streakUnsubscribe();
-    if (moodHistoryUnsubscribe) moodHistoryUnsubscribe();
     chatUnsubscribe = null; chatMetaUnsubscribe = null;
-    lettersUnsubscribe = null; streakUnsubscribe = null; moodHistoryUnsubscribe = null;
+    lettersUnsubscribe = null;
     updateOnlineStatus(false);
     allChatMessages = [];
     replyingTo = null;
     currentUser = null; selectedUser = null; allPostsCache = [];
-    allMoodsCache = {}; encryptionKey = null; isEncryptionSetup = false;
+    encryptionKey = null; isEncryptionSetup = false;
     _decryptCache.clear();
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(ENC_STORAGE_KEY);
@@ -851,11 +816,8 @@ function showMainApp() {
             renderGallery(cachedPosts);
             renderTimeline(cachedPosts);
         }
-        const cachedMoods = await getCachedData('moods');
-        if (cachedMoods) { allMoodsCache = cachedMoods; updateMoodUI(cachedMoods); }
     })();
     attachPostsListener();
-    attachMoodsListener();
     attachCapsulesListener();
     attachCountdownsListener();
     loadAnniversary();
@@ -866,8 +828,6 @@ function showMainApp() {
     loadChatTheme();
     updateOnlineStatus(true);
     attachLettersListener();
-    loadStreak();
-    loadMoodHistory();
     // Show offline banner if currently offline
     if (!isOnline()) showOfflineBanner();
 }
@@ -1250,7 +1210,6 @@ async function createPost() {
         }
         closeCreatePostModal();
         showToast(isOnline() ? 'Posted!' : 'Saved offline — will sync when online');
-        updateStreakOnPost();
     } catch (e) {
         console.error('Create post failed:', e);
         showToast('Failed to post. Try again.');
@@ -1603,89 +1562,6 @@ async function deleteCountdown(id) {
     catch (e) { console.error('Delete countdown failed:', e); }
 }
 
-// ============ MOOD / STATUS ============
-
-function attachMoodsListener() {
-    if (moodsUnsubscribe) moodsUnsubscribe();
-    moodsUnsubscribe = fdb.collection(MOODS_COLLECTION)
-        .onSnapshot(async snapshot => {
-            const moods = {};
-            for (const doc of snapshot.docs) {
-                const data = doc.data();
-                if (isEncryptionSetup) {
-                    if (data.mood) data.mood = await decryptField(data.mood, doc.id, 'mood');
-                    if (data.customText) data.customText = await decryptField(data.customText, doc.id, 'customText');
-                }
-                moods[doc.id] = data;
-            }
-            allMoodsCache = moods;
-            updateMoodUI(moods);
-            cacheData('moods', moods);
-        }, error => console.error('Moods listener error:', error));
-}
-
-function updateMoodUI(moods) {
-    // Update my mood in top bar
-    const myMood = moods[currentUser.toLowerCase()];
-    if (myMood && myMood.mood) {
-        const moodInfo = MOOD_MAP[myMood.mood];
-        document.getElementById('moodEmojiTop').textContent = moodInfo ? moodInfo.emoji : '😊';
-    } else {
-        document.getElementById('moodEmojiTop').textContent = '😊';
-    }
-    // Update partner mood bar
-    const partner = currentUser === 'A' ? 'p' : 'a';
-    const partnerMood = moods[partner];
-    const bar = document.getElementById('partnerMoodBar');
-    if (partnerMood && partnerMood.mood) {
-        const moodInfo = MOOD_MAP[partnerMood.mood];
-        document.getElementById('partnerMoodAvatar').textContent = partner.toUpperCase();
-        document.getElementById('partnerMoodAvatar').className = `partner-mood-avatar user-${partner}`;
-        document.getElementById('partnerMoodText').textContent = partnerMood.customText || (moodInfo ? moodInfo.text : '');
-        document.getElementById('partnerMoodEmoji').textContent = moodInfo ? moodInfo.emoji : '';
-        bar.style.display = 'flex';
-    } else {
-        bar.style.display = 'none';
-    }
-}
-
-let selectedMood = null;
-
-function openMoodSetter() {
-    document.getElementById('moodModal').style.display = 'flex';
-    // Pre-select current mood
-    const myMood = allMoodsCache[currentUser.toLowerCase()];
-    selectedMood = myMood ? myMood.mood : null;
-    document.querySelectorAll('.mood-opt').forEach(opt => {
-        opt.classList.toggle('active', opt.dataset.mood === selectedMood);
-    });
-    document.getElementById('moodCustomText').value = (myMood && myMood.customText) || '';
-}
-
-function closeMoodModal() { document.getElementById('moodModal').style.display = 'none'; }
-
-async function setMood() {
-    if (!selectedMood) { showToast('Pick a mood'); return; }
-    const customText = document.getElementById('moodCustomText').value.trim();
-    try {
-        const encMood = isEncryptionSetup ? await encryptText(selectedMood) : selectedMood;
-        const encCustomText = (isEncryptionSetup && customText) ? await encryptText(customText) : (customText || '');
-        await fdb.collection(MOODS_COLLECTION).doc(currentUser.toLowerCase()).set({
-            user: currentUser, mood: encMood, customText: encCustomText,
-            encrypted: isEncryptionSetup,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        // Also save to mood history for tracker
-        await fdb.collection(MOOD_HISTORY_COLLECTION).add({
-            user: currentUser, mood: encMood, customText: encCustomText,
-            encrypted: isEncryptionSetup,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        closeMoodModal();
-        showToast('Mood updated!');
-    } catch (e) { console.error('Set mood failed:', e); showToast('Failed to set mood'); }
-}
-
 // ============ DAILY LOVE NOTE ============
 
 function getDailyPrompt() {
@@ -1798,13 +1674,6 @@ function renderProfile() {
         ? '<div class="profile-enc-status enc-on"><i class="fas fa-shield-halved"></i> Encrypted</div>'
         : '<div class="profile-enc-status enc-off"><i class="fas fa-lock-open"></i> Not encrypted</div>';
 
-    const myMood = allMoodsCache[currentUser.toLowerCase()];
-    let moodHtml = '<span style="color:var(--text-light)">Not set</span>';
-    if (myMood && myMood.mood) {
-        const moodInfo = MOOD_MAP[myMood.mood];
-        moodHtml = `${moodInfo.emoji} ${moodInfo.text}`;
-    }
-
     container.innerHTML = `
         <div class="profile-card">
             <div class="profile-avatar-large ${avatarClass}">${currentUser}</div>
@@ -1823,15 +1692,11 @@ function renderProfile() {
                     <div class="profile-stat-label">Reactions</div>
                 </div>
             </div>
-            <div class="profile-mood-section">
-                <div class="profile-mood-current">Mood: ${moodHtml}</div>
-                <button class="profile-mood-btn" onclick="openMoodSetter()"><i class="fas fa-face-smile"></i> Change Mood</button>
-            </div>
             <div class="profile-enc-section">${encStatus}</div>
         </div>
         <div class="profile-shortcuts" style="display:flex;gap:8px;margin-bottom:16px;">
-            <button class="profile-mood-btn" onclick="switchScreen('timelineScreen')" style="flex:1;justify-content:center"><i class="fas fa-clock-rotate-left"></i> Timeline</button>
-            <button class="profile-mood-btn" onclick="switchScreen('galleryScreen')" style="flex:1;justify-content:center"><i class="fas fa-images"></i> Gallery</button>
+            <button class="profile-btn" onclick="switchScreen('timelineScreen')" style="flex:1;justify-content:center"><i class="fas fa-clock-rotate-left"></i> Timeline</button>
+            <button class="profile-btn" onclick="switchScreen('galleryScreen')" style="flex:1;justify-content:center"><i class="fas fa-images"></i> Gallery</button>
         </div>
         <div class="profile-section-title">My Posts</div>
         <div id="profileGrid" class="profile-grid"></div>
@@ -3352,239 +3217,6 @@ async function viewLetter(letterId) {
 }
 
 function closeLetterViewModal() { document.getElementById('letterViewModal').style.display = 'none'; }
-
-// ============ MOOD TRACKER COMBO ============
-
-function loadMoodHistory() {
-    if (moodHistoryUnsubscribe) moodHistoryUnsubscribe();
-    moodHistoryUnsubscribe = fdb.collection(MOOD_HISTORY_COLLECTION)
-        .orderBy('createdAt', 'desc')
-        .limit(30)
-        .onSnapshot(async snapshot => {
-            allMoodHistoryCache = [];
-            for (const doc of snapshot.docs) {
-                const data = doc.data();
-                if (isEncryptionSetup) {
-                    if (data.mood) data.mood = await decryptField(data.mood, doc.id, 'mood');
-                    if (data.customText) data.customText = await decryptField(data.customText, doc.id, 'customText');
-                }
-                allMoodHistoryCache.push({ id: doc.id, ...data });
-            }
-            renderMoodTracker();
-        }, error => console.error('Mood history error:', error));
-}
-
-const MOOD_VALUES = {
-    sad: 1, missing: 2, thinking: 3, grateful: 4,
-    happy: 5, loved: 6, playful: 7, excited: 8
-};
-
-function renderMoodTracker() {
-    const canvas = document.getElementById('moodChartCanvas');
-    const emptyEl = document.getElementById('moodTrackerEmpty');
-    const historyList = document.getElementById('moodHistoryList');
-
-    if (allMoodHistoryCache.length === 0) {
-        canvas.style.display = 'none';
-        emptyEl.style.display = 'flex';
-        if (historyList) historyList.innerHTML = '';
-        return;
-    }
-
-    emptyEl.style.display = 'none';
-    canvas.style.display = 'block';
-
-    // Simple chart drawing
-    drawMoodChart(canvas);
-
-    // History list
-    if (historyList) {
-        historyList.innerHTML = allMoodHistoryCache.slice(0, 15).map(h => {
-            const lower = (h.user || 'a').toLowerCase();
-            const moodInfo = MOOD_MAP[h.mood] || { emoji: '😊', text: h.mood };
-            const time = timeAgo(h.createdAt);
-            return `<div class="mood-history-item">
-                <div class="mood-history-avatar user-${lower}">${(h.user || '?').toUpperCase()}</div>
-                <span class="mood-history-emoji">${moodInfo.emoji}</span>
-                <div class="mood-history-info">
-                    <div class="mood-history-mood">${moodInfo.text}</div>
-                    ${h.customText ? `<div class="mood-history-custom">${escapeHtml(h.customText)}</div>` : ''}
-                </div>
-                <span class="mood-history-time">${time}</span>
-            </div>`;
-        }).join('');
-    }
-}
-
-function drawMoodChart(canvas) {
-    const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = 200 * dpr;
-    canvas.style.width = rect.width + 'px';
-    canvas.style.height = '200px';
-    ctx.scale(dpr, dpr);
-
-    const w = rect.width;
-    const h = 200;
-    ctx.clearRect(0, 0, w, h);
-
-    // Get last 14 days of mood data per user
-    const aMoods = allMoodHistoryCache.filter(m => m.user === 'A').reverse().slice(-14);
-    const pMoods = allMoodHistoryCache.filter(m => m.user === 'P').reverse().slice(-14);
-
-    const padding = { top: 20, bottom: 30, left: 30, right: 10 };
-    const chartW = w - padding.left - padding.right;
-    const chartH = h - padding.top - padding.bottom;
-
-    // Grid lines
-    ctx.strokeStyle = '#F5EDEB';
-    ctx.lineWidth = 1;
-    for (let i = 1; i <= 8; i++) {
-        const y = padding.top + chartH - (i / 8) * chartH;
-        ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
-    }
-
-    // Draw line
-    function drawLine(moods, color) {
-        if (moods.length < 2) return;
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        moods.forEach((m, i) => {
-            const x = padding.left + (i / (Math.max(moods.length - 1, 1))) * chartW;
-            const val = MOOD_VALUES[m.mood] || 5;
-            const y = padding.top + chartH - (val / 8) * chartH;
-            if (i === 0) ctx.moveTo(x, y);
-            else ctx.lineTo(x, y);
-        });
-        ctx.stroke();
-
-        // Dots
-        moods.forEach((m, i) => {
-            const x = padding.left + (i / (Math.max(moods.length - 1, 1))) * chartW;
-            const val = MOOD_VALUES[m.mood] || 5;
-            const y = padding.top + chartH - (val / 8) * chartH;
-            ctx.fillStyle = color;
-            ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-        });
-    }
-
-    drawLine(aMoods, '#FF6B8A');
-    drawLine(pMoods, '#8BC4A3');
-}
-
-// Also log mood to history when setting mood
-const _origSetMood = typeof setMood === 'function' ? setMood : null;
-// We'll override setMood after it's defined
-
-// ============ STREAK COUNTER ============
-
-function loadStreak() {
-    if (streakUnsubscribe) streakUnsubscribe();
-    streakUnsubscribe = fdb.collection(STREAKS_COLLECTION).doc('current')
-        .onSnapshot(doc => {
-            if (doc.exists) {
-                renderStreak(doc.data());
-            } else {
-                renderStreak({ days: 0, bestStreak: 0, lastPostDate: null, history: [] });
-            }
-        }, error => console.error('Streak listener error:', error));
-}
-
-function renderStreak(data) {
-    const days = data.days || 0;
-    const best = data.bestStreak || 0;
-
-    document.getElementById('streakNumber').textContent = days;
-    document.getElementById('streakBest').textContent = best;
-
-    const sublabel = document.getElementById('streakSublabel');
-    if (days === 0) sublabel.textContent = 'Post daily to start your streak!';
-    else if (days === 1) sublabel.textContent = 'Great start! Keep it going!';
-    else if (days < 7) sublabel.textContent = `${days} days strong! Don't break it!`;
-    else if (days < 30) sublabel.textContent = `${days} days! You're on fire!`;
-    else sublabel.textContent = `${days} days! Legendary couple!`;
-
-    // Calendar
-    renderStreakCalendar(data);
-}
-
-function renderStreakCalendar(data) {
-    const cal = document.getElementById('streakCalendar');
-    if (!cal) return;
-    const now = new Date();
-    const history = data.history || [];
-    const historySet = new Set(history.map(d => {
-        if (d.toDate) return d.toDate().toISOString().split('T')[0];
-        return new Date(d).toISOString().split('T')[0];
-    }));
-
-    // Get current month
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const today = now.getDate();
-
-    const dayNames = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    let html = dayNames.map(d => `<div class="streak-cal-day header">${d}</div>`).join('');
-
-    for (let i = 0; i < firstDay; i++) html += '<div class="streak-cal-day"></div>';
-
-    for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const isStreak = historySet.has(dateStr);
-        const isToday = d === today;
-        let cls = 'streak-cal-day';
-        if (isStreak) cls += ' streak-day';
-        if (isToday) cls += ' today';
-        html += `<div class="${cls}">${d}</div>`;
-    }
-
-    cal.innerHTML = html;
-}
-
-// Check and update streak when posting
-async function updateStreakOnPost() {
-    if (!fdb || !currentUser) return;
-    try {
-        const today = new Date().toISOString().split('T')[0];
-        const doc = await fdb.collection(STREAKS_COLLECTION).doc('current').get();
-
-        if (!doc.exists) {
-            await fdb.collection(STREAKS_COLLECTION).doc('current').set({
-                days: 1, bestStreak: 1, lastPostDate: today,
-                history: [today], updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            return;
-        }
-
-        const data = doc.data();
-        const lastPost = data.lastPostDate;
-
-        if (lastPost === today) return; // Already posted today
-
-        const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-        let newDays;
-        if (lastPost === yesterday) {
-            newDays = (data.days || 0) + 1;
-        } else {
-            newDays = 1; // Streak broken
-        }
-
-        const newBest = Math.max(newDays, data.bestStreak || 0);
-        const history = data.history || [];
-        if (!history.includes(today)) history.push(today);
-
-        await fdb.collection(STREAKS_COLLECTION).doc('current').set({
-            days: newDays, bestStreak: newBest, lastPostDate: today,
-            history, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-    } catch (e) { console.error('Update streak failed:', e); }
-}
 
 // Online status on tab close/hide — multiple fallbacks for mobile reliability
 window.addEventListener('beforeunload', () => {
